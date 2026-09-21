@@ -1,0 +1,133 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Log in to PostNord",
+        "description": "PostNord's login finishes in the PostNord app, so its last address is copied over by hand.\n\n1. Open an empty browser tab and press **F12**. On the **Network** tab, turn on **Preserve log** (Firefox: **Persist Logs** under the gear).\n2. Copy [the login link]({login_url}) (right-click › Copy link), open it in that tab and log in.\n3. Type `code=` in the Network filter and copy the address that starts with `com.postnord.app://redirect?code=`. If it isn't listed, it's in the **Location** header of the last `account.postnord.com` request.",
+        "data": {
+          "redirect_url": "Login address"
+        },
+        "data_description": {
+          "redirect_url": "Paste it and continue within a few minutes; the code in it works only once."
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Logged in as **{username}**. These can be changed later with Reconfigure.",
+        "data": {
+          "language": "Language",
+          "prioritize_undelivered": "Undelivered packages first",
+          "max_shipments": "Maximum number of packages",
+          "stale_shipment_day_limit": "Days until undelivered packages are hidden",
+          "completed_shipment_day_shown": "Days until delivered packages are hidden",
+          "include_pickup_details": "Pickup point and code"
+        },
+        "data_description": {
+          "language": "Language of the package event descriptions.",
+          "prioritize_undelivered": "When there are more packages than the maximum, undelivered ones are listed before delivered ones.",
+          "max_shipments": "How many packages the sensor lists.",
+          "stale_shipment_day_limit": "Counted from the package's latest event. Some packages stay in delivery for good.",
+          "completed_shipment_day_shown": "Counted from the delivery.",
+          "include_pickup_details": "Add the pickup point and pickup code to package data. Off by default as this is sensitive data."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Log in again",
+        "description": "PostNord no longer accepts the saved login of **{username}**.\n\n1. Open an empty browser tab and press **F12**. On the **Network** tab, turn on **Preserve log** (Firefox: **Persist Logs** under the gear).\n2. Copy [the login link]({login_url}) (right-click › Copy link), open it in that tab and log in.\n3. Type `code=` in the Network filter and copy the address that starts with `com.postnord.app://redirect?code=`. If it isn't listed, it's in the **Location** header of the last `account.postnord.com` request.",
+        "data": {
+          "redirect_url": "Login address"
+        },
+        "data_description": {
+          "redirect_url": "Paste it and continue within a few minutes; the code in it works only once."
+        }
+      },
+      "reconfigure": {
+        "title": "PostNord package tracking",
+        "description": "**{username}**",
+        "menu_options": {
+          "reconfigure_settings": "Change settings",
+          "reconfigure_login": "Log in again"
+        }
+      },
+      "reconfigure_settings": {
+        "title": "Change settings",
+        "description": "**{username}**",
+        "data": {
+          "language": "Language",
+          "prioritize_undelivered": "Undelivered packages first",
+          "max_shipments": "Maximum number of packages",
+          "stale_shipment_day_limit": "Days until undelivered packages are hidden",
+          "completed_shipment_day_shown": "Days until delivered packages are hidden",
+          "include_pickup_details": "Pickup point and code"
+        },
+        "data_description": {
+          "language": "Language of the package event descriptions.",
+          "prioritize_undelivered": "When there are more packages than the maximum, undelivered ones are listed before delivered ones.",
+          "max_shipments": "How many packages the sensor lists.",
+          "stale_shipment_day_limit": "Counted from the package's latest event. Some packages stay in delivery for good.",
+          "completed_shipment_day_shown": "Counted from the delivery.",
+          "include_pickup_details": "Add the pickup point and pickup code to package data."
+        }
+      },
+      "reconfigure_login": {
+        "title": "Log in again",
+        "description": "Logging in again as **{username}**.\n\n1. Open an empty browser tab and press **F12**. On the **Network** tab, turn on **Preserve log** (Firefox: **Persist Logs** under the gear).\n2. Copy [the login link]({login_url}) (right-click › Copy link), open it in that tab and log in.\n3. Type `code=` in the Network filter and copy the address that starts with `com.postnord.app://redirect?code=`. If it isn't listed, it's in the **Location** header of the last `account.postnord.com` request.",
+        "data": {
+          "redirect_url": "Login address"
+        },
+        "data_description": {
+          "redirect_url": "Paste it and continue within a few minutes; the code in it works only once."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "PostNord didn't accept the login. The code expires in minutes and works only once: log in again with the link and paste the new address straight away.",
+      "no_code": "That isn't the login address. Copy the whole address that starts with com.postnord.app://redirect?code=.",
+      "wrong_state": "That address is from another login. Use the link on this form.",
+      "wrong_account": "That login is for another PostNord account. Log in as {username}.",
+      "cannot_connect": "PostNord couldn't be reached. Try again in a moment."
+    },
+    "abort": {
+      "already_configured": "This PostNord account has already been added.",
+      "reauth_successful": "Logged in again.",
+      "reconfigure_successful": "Saved."
+    }
+  },
+  "selector": {
+    "language": {
+      "options": {
+        "fi": "Suomi",
+        "sv": "Svenska",
+        "nb": "Norsk",
+        "da": "Dansk",
+        "en": "English"
+      }
+    }
+  },
+  "entity": {
+    "event": {
+      "package": {
+        "name": "Package",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "new_package": "New package",
+              "moved": "Moved",
+              "ready_for_pickup": "Ready for pickup",
+              "delivered": "Delivered",
+              "returned": "Returned"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "on_the_way": {
+        "name": "Packages on the way"
+      },
+      "ready_for_pickup": {
+        "name": "Packages ready for pickup"
+      }
+    }
+  }
+}

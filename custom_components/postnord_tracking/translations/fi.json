@@ -1,0 +1,133 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kirjaudu PostNordiin",
+        "description": "PostNordin kirjautuminen päättyy PostNord-sovellukseen, joten sen viimeinen osoite kopioidaan käsin.\n\n1. Avaa tyhjä selainvälilehti ja paina **F12**. Ota **Network**- eli **Verkko**-välilehdellä käyttöön **Preserve log** (Firefoxissa **Säilytä lokit** rataskuvakkeen alta).\n2. Kopioi [kirjautumislinkki]({login_url}) (hiiren oikea › Kopioi linkki), avaa se siinä välilehdessä ja kirjaudu.\n3. Kirjoita Network-suodattimeen `code=` ja kopioi osoite, joka alkaa `com.postnord.app://redirect?code=`. Jos sitä ei näy listassa, se on viimeisimmän `account.postnord.com`-pyynnön **Location**-otsakkeessa.",
+        "data": {
+          "redirect_url": "Kirjautumisosoite"
+        },
+        "data_description": {
+          "redirect_url": "Liitä se ja jatka muutaman minuutin sisällä; sen koodi toimii vain kerran."
+        }
+      },
+      "settings": {
+        "title": "Asetukset",
+        "description": "Kirjauduttu tilille **{username}**. Asetuksia voi muuttaa myöhemmin kohdasta Määritä uudelleen.",
+        "data": {
+          "language": "Kieli",
+          "prioritize_undelivered": "Toimittamattomat ensin",
+          "max_shipments": "Pakettien enimmäismäärä",
+          "stale_shipment_day_limit": "Montako päivää toimittamattomat näkyvät",
+          "completed_shipment_day_shown": "Montako päivää toimitetut näkyvät",
+          "include_pickup_details": "Noutopaikka ja -koodi"
+        },
+        "data_description": {
+          "language": "Pakettitapahtumien kuvausten kieli.",
+          "prioritize_undelivered": "Kun paketteja on enemmän kuin enimmäismäärä, toimittamattomat listataan ennen toimitettuja.",
+          "max_shipments": "Montako pakettia sensori listaa.",
+          "stale_shipment_day_limit": "Lasketaan paketin viimeisimmästä tapahtumasta. Osa paketeista jää ikuisesti toimitukseen.",
+          "completed_shipment_day_shown": "Lasketaan toimituksesta.",
+          "include_pickup_details": "Lisää noutopaikan ja -koodin pakettitietoihin. Oletuksena pois, koska tieto on arkaluontoista."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Kirjaudu uudelleen",
+        "description": "PostNord ei enää hyväksy tilin **{username}** tallennettua kirjautumista.\n\n1. Avaa tyhjä selainvälilehti ja paina **F12**. Ota **Network**- eli **Verkko**-välilehdellä käyttöön **Preserve log** (Firefoxissa **Säilytä lokit** rataskuvakkeen alta).\n2. Kopioi [kirjautumislinkki]({login_url}) (hiiren oikea › Kopioi linkki), avaa se siinä välilehdessä ja kirjaudu.\n3. Kirjoita Network-suodattimeen `code=` ja kopioi osoite, joka alkaa `com.postnord.app://redirect?code=`. Jos sitä ei näy listassa, se on viimeisimmän `account.postnord.com`-pyynnön **Location**-otsakkeessa.",
+        "data": {
+          "redirect_url": "Kirjautumisosoite"
+        },
+        "data_description": {
+          "redirect_url": "Liitä se ja jatka muutaman minuutin sisällä; sen koodi toimii vain kerran."
+        }
+      },
+      "reconfigure": {
+        "title": "PostNord-pakettiseuranta",
+        "description": "**{username}**",
+        "menu_options": {
+          "reconfigure_settings": "Muuta asetuksia",
+          "reconfigure_login": "Kirjaudu uudelleen"
+        }
+      },
+      "reconfigure_settings": {
+        "title": "Muuta asetuksia",
+        "description": "**{username}**",
+        "data": {
+          "language": "Kieli",
+          "prioritize_undelivered": "Toimittamattomat ensin",
+          "max_shipments": "Pakettien enimmäismäärä",
+          "stale_shipment_day_limit": "Montako päivää toimittamattomat näkyvät",
+          "completed_shipment_day_shown": "Montako päivää toimitetut näkyvät",
+          "include_pickup_details": "Noutopaikka ja -koodi"
+        },
+        "data_description": {
+          "language": "Pakettitapahtumien kuvausten kieli.",
+          "prioritize_undelivered": "Kun paketteja on enemmän kuin enimmäismäärä, toimittamattomat listataan ennen toimitettuja.",
+          "max_shipments": "Montako pakettia sensori listaa.",
+          "stale_shipment_day_limit": "Lasketaan paketin viimeisimmästä tapahtumasta. Osa paketeista jää ikuisesti toimitukseen.",
+          "completed_shipment_day_shown": "Lasketaan toimituksesta.",
+          "include_pickup_details": "Lisää noutopaikan ja -koodin pakettitietoihin."
+        }
+      },
+      "reconfigure_login": {
+        "title": "Kirjaudu uudelleen",
+        "description": "Kirjaudutaan uudelleen tilille **{username}**.\n\n1. Avaa tyhjä selainvälilehti ja paina **F12**. Ota **Network**- eli **Verkko**-välilehdellä käyttöön **Preserve log** (Firefoxissa **Säilytä lokit** rataskuvakkeen alta).\n2. Kopioi [kirjautumislinkki]({login_url}) (hiiren oikea › Kopioi linkki), avaa se siinä välilehdessä ja kirjaudu.\n3. Kirjoita Network-suodattimeen `code=` ja kopioi osoite, joka alkaa `com.postnord.app://redirect?code=`. Jos sitä ei näy listassa, se on viimeisimmän `account.postnord.com`-pyynnön **Location**-otsakkeessa.",
+        "data": {
+          "redirect_url": "Kirjautumisosoite"
+        },
+        "data_description": {
+          "redirect_url": "Liitä se ja jatka muutaman minuutin sisällä; sen koodi toimii vain kerran."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "PostNord ei hyväksynyt kirjautumista. Koodi vanhenee minuuteissa ja toimii vain kerran: kirjaudu uudelleen linkistä ja liitä uusi osoite heti.",
+      "no_code": "Tämä ei ole kirjautumisosoite. Kopioi koko osoite, joka alkaa com.postnord.app://redirect?code=.",
+      "wrong_state": "Osoite on toisesta kirjautumisesta. Käytä tämän lomakkeen linkkiä.",
+      "wrong_account": "Kirjauduit toiselle PostNord-tilille. Kirjaudu tilille {username}.",
+      "cannot_connect": "PostNordiin ei saatu yhteyttä. Yritä hetken päästä uudelleen."
+    },
+    "abort": {
+      "already_configured": "Tämä PostNord-tili on jo lisätty.",
+      "reauth_successful": "Kirjauduttu uudelleen.",
+      "reconfigure_successful": "Tallennettu."
+    }
+  },
+  "selector": {
+    "language": {
+      "options": {
+        "fi": "Suomi",
+        "sv": "Svenska",
+        "nb": "Norsk",
+        "da": "Dansk",
+        "en": "English"
+      }
+    }
+  },
+  "entity": {
+    "event": {
+      "package": {
+        "name": "Paketti",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "new_package": "Uusi paketti",
+              "moved": "Liikkui",
+              "ready_for_pickup": "Noudettavissa",
+              "delivered": "Toimitettu",
+              "returned": "Palautettu"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "on_the_way": {
+        "name": "Paketteja matkalla"
+      },
+      "ready_for_pickup": {
+        "name": "Paketteja noudettavissa"
+      }
+    }
+  }
+}

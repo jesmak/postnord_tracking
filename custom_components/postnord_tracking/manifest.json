@@ -1,0 +1,15 @@
+{
+  "domain": "postnord_tracking",
+  "name": "PostNord package tracking",
+  "codeowners": [
+    "@jesmak"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/jesmak/postnord_tracking",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/jesmak/postnord_tracking/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}
