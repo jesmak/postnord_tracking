@@ -41,7 +41,7 @@ STATUS_UNKNOWN = 7
 
 # PostNord's status strings onto the shared statuses. AVAILABLE_FOR_DELIVERY is mapped to ready
 # for pickup on the strength of the archived data alone; confirm against an active parcel at a
-# locker before trusting it (it may mean out-for-home-delivery in some cases). See NOTES.md.
+# locker before trusting it (it may mean out-for-home-delivery in some cases).
 STATUS_MAP = {
     "CREATED": STATUS_WAITING,
     "INFORMED": STATUS_WAITING,
@@ -194,7 +194,7 @@ def package(shipment: Mapping[str, Any], changed: datetime, settings: PackageSet
         "latest_event_country": consignee.get("countryCode"),
         "latest_event_date": changed.isoformat(),
         # Only on active parcels; absent (None) on delivered ones. Field names are tentative
-        # until an active parcel is captured — see NOTES.md.
+        # until an active parcel is captured.
         "estimated_delivery": iso(
             parse_time(shipment.get("estimatedTimeOfArrival") or shipment.get("publicTimeOfArrival"))
         ),
@@ -237,7 +237,7 @@ def measure(value: Any) -> Any:
 
 def pickup_point(point: Mapping[str, Any], consignee: Mapping[str, Any]) -> dict[str, Any] | None:
     """Where the package is picked up. Only active parcels carry a destinationDeliveryPoint;
-    the field names are tentative until one is captured (see NOTES.md), so read defensively."""
+    the field names are tentative until one is captured, so read defensively."""
     address = point.get("address") if isinstance(point.get("address"), Mapping) else point
     found = {
         "name": point.get("name"),

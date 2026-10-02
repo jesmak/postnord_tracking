@@ -123,7 +123,7 @@ def test_an_account_without_parcels() -> None:
 
 
 def with_details(**changes: Any) -> dict[str, Any]:
-    """A parcel with the extra fields active parcels carry (tentative shape, see NOTES.md)."""
+    """A parcel with the extra fields active parcels carry (tentative shape)."""
     data = shipment("PN0020", "AVAILABLE_FOR_DELIVERY", "2026-09-16T08:00:00Z")
     data["estimatedTimeOfArrival"] = "2026-09-17T07:00:00Z"
     data["destinationDeliveryPoint"] = {

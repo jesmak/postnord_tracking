@@ -11,7 +11,7 @@ ATTRIBUTION: Final = "Data provided by PostNord Group AB"
 TRACKING_URL: Final = "https://tracking.postnord.com/?id={number}"
 
 # The app's own gateway. The subscription key rides in the query string (?apikey=), the OAuth
-# token in Authorization, and every call carries the context header. See NOTES.md in the repo root.
+# token in Authorization, and every call carries the context header.
 API_BASE_URL: Final = "https://api2.postnord.com/rest"
 PATH_TRACKING: Final = "/customer/v2/receiverapp/tracking"
 API_KEY: Final = "1ecf161be47543b19fce03f953a6e8d2"
