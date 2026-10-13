@@ -105,9 +105,7 @@ def test_a_parcel_delivered_from_its_delivery_date_without_events() -> None:
     [delivered] = build_packages(
         tracking(
             active=[],
-            archived=[
-                shipment("PN0200", "DELIVERED", event="Lähetys on toimitettu", delivery_date="2026-09-16T05:00:00Z")
-            ],
+            archived=[shipment("PN0200", "DELIVERED", event="Lähetys on toimitettu", delivery_date="2026-09-16T05:00:00Z")],
         ),
         SETTINGS,
         NOW,

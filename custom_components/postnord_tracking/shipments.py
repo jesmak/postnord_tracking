@@ -75,9 +75,7 @@ class PackageSettings:
             prioritize_undelivered=bool(data.get(CONF_PRIORITIZE_UNDELIVERED, DEFAULT_PRIORITIZE_UNDELIVERED)),
             max_shipments=int(data.get(CONF_MAX_SHIPMENTS, DEFAULT_MAX_SHIPMENTS)),
             stale_shipment_day_limit=int(data.get(CONF_STALE_SHIPMENT_DAY_LIMIT, DEFAULT_STALE_SHIPMENT_DAY_LIMIT)),
-            completed_shipment_days_shown=int(
-                data.get(CONF_COMPLETED_SHIPMENT_DAYS_SHOWN, DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN)
-            ),
+            completed_shipment_days_shown=int(data.get(CONF_COMPLETED_SHIPMENT_DAYS_SHOWN, DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN)),
             include_pickup_details=bool(data.get(CONF_INCLUDE_PICKUP_DETAILS, DEFAULT_INCLUDE_PICKUP_DETAILS)),
         )
 
@@ -195,9 +193,7 @@ def package(shipment: Mapping[str, Any], changed: datetime, settings: PackageSet
         "latest_event_date": changed.isoformat(),
         # Only on active parcels; absent (None) on delivered ones. Field names are tentative
         # until an active parcel is captured.
-        "estimated_delivery": iso(
-            parse_time(shipment.get("estimatedTimeOfArrival") or shipment.get("publicTimeOfArrival"))
-        ),
+        "estimated_delivery": iso(parse_time(shipment.get("estimatedTimeOfArrival") or shipment.get("publicTimeOfArrival"))),
         "pickup_deadline": None,
         "weight": number(measure(item.get("weight"))),
         "package_count": item_count(shipment),

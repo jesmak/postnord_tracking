@@ -131,9 +131,7 @@ async def test_adding_an_account(hass: HomeAssistant, aioclient_mock: AiohttpCli
     assert hass.states.get("sensor.postnord_matti_meikalainen_example_com") is not None
 
 
-async def test_the_code_is_exchanged_with_the_verifier_of_the_link(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-) -> None:
+async def test_the_code_is_exchanged_with_the_verifier_of_the_link(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     expect_login(aioclient_mock)
     result = await start(hass)
     challenge = login_params(result)["code_challenge"]
@@ -202,9 +200,7 @@ async def test_an_account_is_added_only_once(hass: HomeAssistant, aioclient_mock
     assert result["reason"] == "already_configured"
 
 
-async def test_logging_in_again_when_the_login_stops_working(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-) -> None:
+async def test_logging_in_again_when_the_login_stops_working(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     expect_login(aioclient_mock)
     entry = account(hass, access_token="expired", refresh_token="expired")
 

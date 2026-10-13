@@ -21,16 +21,12 @@ ENTITY_ID = "sensor.postnord_matti_meikalainen_example_com"
 
 
 def account(hass: HomeAssistant, **options: object) -> MockConfigEntry:
-    entry = MockConfigEntry(
-        domain=DOMAIN, title=USERNAME, version=1, unique_id=USERNAME, data={**ENTRY_DATA, **options}
-    )
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, unique_id=USERNAME, data={**ENTRY_DATA, **options})
     entry.add_to_hass(hass)
     return entry
 
 
-async def test_the_sensor_lists_the_packages(
-    hass: HomeAssistant, postnord: AiohttpClientMocker, freezer: FrozenDateTimeFactory
-) -> None:
+async def test_the_sensor_lists_the_packages(hass: HomeAssistant, postnord: AiohttpClientMocker, freezer: FrozenDateTimeFactory) -> None:
     freezer.move_to(NOW)
     entry = account(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -71,9 +67,7 @@ async def test_a_refreshed_access_token_is_saved(
     assert hass.states.get(ENTITY_ID).state == "2026-09-16T08:30:00+00:00"
 
 
-async def test_a_token_that_stops_working_asks_for_a_new_one(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-) -> None:
+async def test_a_token_that_stops_working_asks_for_a_new_one(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     aioclient_mock.get(TRACKING_URL, status=401)
     aioclient_mock.post(TOKEN_URL, status=400, json={"error": "invalid_grant"})
     entry = account(hass)

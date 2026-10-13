@@ -58,9 +58,7 @@ def shipment(
         "statusText": {"header": event, "body": event},
     }
     if event_time is not None:
-        item["events"] = [
-            {"eventDescription": event, "eventTime": event_time, "status": status, "location": {"city": "Tampere"}}
-        ]
+        item["events"] = [{"eventDescription": event, "eventTime": event_time, "status": status, "location": {"city": "Tampere"}}]
     data: dict[str, Any] = {
         "shipmentId": shipment_id,
         "status": status,

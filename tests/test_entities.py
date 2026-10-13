@@ -41,9 +41,7 @@ async def set_up(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> MockCon
     return entry
 
 
-async def test_the_counts_of_the_packages(
-    hass: HomeAssistant, postnord: AiohttpClientMocker, freezer: FrozenDateTimeFactory
-) -> None:
+async def test_the_counts_of_the_packages(hass: HomeAssistant, postnord: AiohttpClientMocker, freezer: FrozenDateTimeFactory) -> None:
     await set_up(hass, freezer)
 
     assert hass.states.get(ON_THE_WAY).state == "2", "ready for pickup and in transport"

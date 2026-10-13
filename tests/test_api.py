@@ -26,9 +26,7 @@ from .conftest import (
 
 
 def client(hass: HomeAssistant, saved: list[str] | None = None) -> PostNordClient:
-    return PostNordClient(
-        async_get_clientsession(hass), ACCESS_TOKEN, REFRESH_TOKEN, "fi", saved.append if saved is not None else None
-    )
+    return PostNordClient(async_get_clientsession(hass), ACCESS_TOKEN, REFRESH_TOKEN, "fi", saved.append if saved is not None else None)
 
 
 async def test_parcels_are_fetched_with_the_token(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
@@ -44,9 +42,7 @@ async def test_parcels_are_fetched_with_the_token(hass: HomeAssistant, aioclient
 
 
 @pytest.mark.parametrize("first_status", [401, 403])
-async def test_an_expired_token_is_refreshed(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, first_status: int
-) -> None:
+async def test_an_expired_token_is_refreshed(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, first_status: int) -> None:
     aioclient_mock.get(TRACKING_URL, side_effect=answers((first_status, None), (200, tracking())))
     aioclient_mock.post(TOKEN_URL, json=TOKEN)
     saved: list[str] = []
@@ -70,18 +66,14 @@ async def test_a_rotated_refresh_token_is_kept(hass: HomeAssistant, aioclient_mo
     assert postnord.refresh_token == NEW_REFRESH_TOKEN, "the next refresh must use the rotated token"
 
 
-async def test_a_refused_refresh_token_needs_a_new_one(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-) -> None:
+async def test_a_refused_refresh_token_needs_a_new_one(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     aioclient_mock.get(TRACKING_URL, status=401)
     aioclient_mock.post(TOKEN_URL, status=400, json={"error": "invalid_grant"})
     with pytest.raises(PostNordAuthError):
         await client(hass).tracking()
 
 
-async def test_a_refreshed_token_that_is_refused_too_needs_a_new_one(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
-) -> None:
+async def test_a_refreshed_token_that_is_refused_too_needs_a_new_one(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     aioclient_mock.get(TRACKING_URL, status=401)
     aioclient_mock.post(TOKEN_URL, json=TOKEN)
     with pytest.raises(PostNordAuthError):
