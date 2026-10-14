@@ -37,7 +37,7 @@ SETTINGS = {
     "max_shipments": 5.0,
     "stale_shipment_day_limit": 15.0,
     "completed_shipment_day_shown": 3.0,
-    "include_pickup_details": False,
+    "pickup_code": "none",
 }
 NEW_SETTINGS = {
     "language": "en",
@@ -45,7 +45,7 @@ NEW_SETTINGS = {
     "max_shipments": 10.0,
     "stale_shipment_day_limit": 30.0,
     "completed_shipment_day_shown": 170.0,
-    "include_pickup_details": True,
+    "pickup_code": "code",
 }
 STORED_NEW_SETTINGS = {
     "language": "en",
@@ -53,7 +53,7 @@ STORED_NEW_SETTINGS = {
     "max_shipments": 10,
     "stale_shipment_day_limit": 30,
     "completed_shipment_day_shown": 170,
-    "include_pickup_details": True,
+    "pickup_code": "code",
 }
 NEW_TOKENS = {"access_token": NEW_ACCESS_TOKEN, "refresh_token": NEW_REFRESH_TOKEN}
 
@@ -83,7 +83,7 @@ def exchange_form(aioclient_mock: AiohttpClientMocker) -> dict[str, Any]:
 
 
 def account(hass: HomeAssistant, **data: object) -> MockConfigEntry:
-    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, unique_id=USERNAME, data={**ENTRY_DATA, **data})
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=2, unique_id=USERNAME, data={**ENTRY_DATA, **data})
     entry.add_to_hass(hass)
     return entry
 
@@ -177,6 +177,15 @@ async def test_an_expired_code(hass: HomeAssistant, aioclient_mock: AiohttpClien
     assert result["errors"] == {"base": "invalid_auth"}
     # The same link is offered again, so logging in with it again works.
     assert result["description_placeholders"]["login_url"] == link
+
+
+async def test_a_busy_login_is_not_a_wrong_code(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    aioclient_mock.post(TOKEN_URL, status=429, json={"error": "too_many_requests"})
+    result = await start(hass)
+
+    result = await paste(hass, result, redirect(result))
+
+    assert result["errors"] == {"base": "cannot_connect"}
 
 
 async def test_postnord_cannot_be_reached(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:

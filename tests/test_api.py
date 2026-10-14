@@ -80,6 +80,40 @@ async def test_a_refreshed_token_that_is_refused_too_needs_a_new_one(hass: HomeA
         await client(hass).tracking()
 
 
+async def test_a_gateway_that_refuses_a_fresh_token_is_no_reason_to_log_in_again(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    # Such as after PostNord changes the app's API key: a new login would be refused the same way.
+    aioclient_mock.get(TRACKING_URL, status=403)
+    aioclient_mock.post(TOKEN_URL, json=TOKEN)
+    with pytest.raises(PostNordError) as error:
+        await client(hass).tracking()
+    assert not isinstance(error.value, PostNordAuthError)
+
+
+@pytest.mark.parametrize("error", ["invalid_grant", "invalid_client", "unauthorized_client"])
+async def test_a_refresh_token_postnord_says_is_gone_needs_a_new_login(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, error: str
+) -> None:
+    aioclient_mock.get(TRACKING_URL, status=401)
+    aioclient_mock.post(TOKEN_URL, status=400, json={"error": error})
+    with pytest.raises(PostNordAuthError):
+        await client(hass).tracking()
+
+
+@pytest.mark.parametrize(
+    ("token_status", "answer"), [(429, {"error": "too_many_requests"}), (400, {"error": "temporarily_unavailable"}), (403, {})]
+)
+async def test_a_refresh_that_fails_otherwise_is_tried_again_later(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, token_status: int, answer: dict
+) -> None:
+    aioclient_mock.get(TRACKING_URL, status=401)
+    aioclient_mock.post(TOKEN_URL, status=token_status, json=answer)
+    with pytest.raises(PostNordError) as error:
+        await client(hass).tracking()
+    assert not isinstance(error.value, PostNordAuthError)
+
+
 @pytest.mark.parametrize(("tracking_status", "token_status"), [(503, None), (401, 502)])
 async def test_server_errors_are_not_token_problems(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, tracking_status: int, token_status: int | None

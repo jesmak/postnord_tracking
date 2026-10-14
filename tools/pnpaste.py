@@ -63,8 +63,9 @@ def main() -> None:
 
     pasted = input("URL: ").strip()
     fields = urllib.parse.parse_qs(urllib.parse.urlparse(pasted).query)
-    if fields.get("state", [None])[0] not in (None, state):
-        print("State mismatch:", fields)
+    # The state has to come back as it was sent, so a code from some other login can't be pasted in by mistake.
+    if fields.get("state", [None])[0] != state:
+        print("The state is missing or doesn't match this login. Paste the whole redirect address.")
         return
     code = fields.get("code", [None])[0]
     if not code:
@@ -102,10 +103,11 @@ def main() -> None:
         val = payload.get(key)
         print(f"{key}: {val[:40] + '...' if val else '(missing)'}")
     print("expires_in:", payload.get("expires_in"))
-    out = os.path.join(tempfile.gettempdir(), "pn_tokens.json")
-    with open(out, "w") as handle:
-        json.dump(payload, handle, indent=2)
-    print(f"\nFull response written to {out}")
+    # A new file of its own, readable only by you: the refresh token in it logs in to the account.
+    handle, out = tempfile.mkstemp(prefix="pn_tokens_", suffix=".json")
+    with os.fdopen(handle, "w") as file:
+        json.dump(payload, file, indent=2)
+    print(f"\nThe full response, refresh token included, is in {out}, readable only by you. Delete it when done.")
 
 
 if __name__ == "__main__":

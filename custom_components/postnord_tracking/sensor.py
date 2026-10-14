@@ -8,15 +8,18 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTRIBUTION, CONF_USERNAME, DOMAIN
+from .const import ATTRIBUTION, CONF_USERNAME
 from .coordinator import PostNordConfigEntry, PostNordCoordinator
 from .shipments import COMPLETED_STATUSES, STATUS_READY_FOR_PICKUP
 
 ATTR_PACKAGES = "packages"
+
+
+# The coordinator fetches for every entity at once, so the entities themselves update nothing.
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
@@ -43,19 +46,15 @@ class PostNordSensor(CoordinatorEntity[PostNordCoordinator], SensorEntity):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_has_entity_name = True
     _attr_name = None
-    _attr_icon = "mdi:package"
+    # Names nothing, as the sensor is the device itself, but gives it its icon in icons.json.
+    _attr_translation_key = "packages"
 
     def __init__(self, coordinator: PostNordCoordinator) -> None:
         super().__init__(coordinator)
         entry = coordinator.config_entry
         username = entry.data[CONF_USERNAME]
         self._attr_unique_id = f"postnord_{username}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=f"PostNord ({username})",
-            manufacturer="PostNord",
-            entry_type=DeviceEntryType.SERVICE,
-        )
+        self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self) -> datetime | None:
@@ -79,18 +78,13 @@ class PostNordCountSensor(CoordinatorEntity[PostNordCoordinator], SensorEntity):
         username = entry.data[CONF_USERNAME]
         self._counts = counts
         self._attr_translation_key = key
-        self._attr_icon = "mdi:package-variant-closed" if key == "on_the_way" else "mdi:package-down"
         self._attr_unique_id = f"postnord_{username}_{key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=f"PostNord ({username})",
-            manufacturer="PostNord",
-            entry_type=DeviceEntryType.SERVICE,
-        )
+        self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self) -> int | None:
         data = self.coordinator.data
         if data is None:
             return None
-        return sum(1 for package in data.packages if self._counts(package.get("status")))
+        # All of them, not only those the list has room for.
+        return sum(1 for package in data.current if self._counts(package.get("status")))

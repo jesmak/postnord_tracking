@@ -26,7 +26,7 @@ ENTRY_DATA = {
     "max_shipments": 5,
     "stale_shipment_day_limit": 15,
     "completed_shipment_day_shown": 3,
-    "include_pickup_details": False,
+    "pickup_code": "none",
 }
 
 NOW = datetime(2026, 9, 16, 9, 0, tzinfo=UTC)
@@ -62,7 +62,7 @@ def shipment(
     data: dict[str, Any] = {
         "shipmentId": shipment_id,
         "status": status,
-        "consignor": {"name": "Verkkokauppa.com", "address": {"city": "Stockholm", "countryCode": "SE"}},
+        "consignor": {"name": "Example Shop", "address": {"city": "Stockholm", "countryCode": "SE"}},
         "consignee": {"address": {"city": "Tampere", "postCode": "33100", "countryCode": "FI"}},
         "userData": {"dateAdded": "2026-09-14T06:00:00Z", "direction": "incoming"},
         "items": [item],

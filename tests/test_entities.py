@@ -27,7 +27,7 @@ async def answer(active: list[dict[str, Any]]) -> AiohttpClientMockResponse:
 
 
 def account(hass: HomeAssistant) -> MockConfigEntry:
-    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, unique_id=USERNAME, data=ENTRY_DATA)
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=2, unique_id=USERNAME, data=ENTRY_DATA)
     entry.add_to_hass(hass)
     return entry
 
@@ -124,3 +124,42 @@ async def test_every_change_of_one_update_fires_its_own_event(
     await hass.async_block_till_done()
 
     assert seen == ["ready_for_pickup", "delivered"], "one event for each package that changed"
+
+
+async def failure(method: str, url: str) -> AiohttpClientMockResponse:
+    return AiohttpClientMockResponse(method, url, status=503)
+
+
+async def test_an_event_after_a_failed_update_does_not_come_from_unavailable(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer: FrozenDateTimeFactory
+) -> None:
+    current = [shipment("PN0500", "EN_ROUTE", "2026-09-16T08:30:00Z", event="Lähetys on kuljetuksessa")]
+    down = False
+    aioclient_mock.post(TOKEN_URL, json={"access_token": "t"})
+    aioclient_mock.get(TRACKING_URL, side_effect=lambda *_: failure("get", TRACKING_URL) if down else answer(current))
+    await set_up(hass, freezer)
+
+    down = True
+    freezer.tick(timedelta(minutes=11))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(EVENT_ENTITY).state == "unavailable"
+
+    writes: list[tuple[str, str | None]] = []
+    hass.bus.async_listen(
+        "state_changed",
+        lambda call: (
+            writes.append((call.data["old_state"].state, call.data["new_state"].attributes.get("event_type")))
+            if call.data["entity_id"] == EVENT_ENTITY
+            else None
+        ),
+    )
+    down = False
+    current[:] = [shipment("PN0500", "AVAILABLE_FOR_DELIVERY", "2026-09-16T11:30:00Z")]
+    freezer.tick(timedelta(minutes=11))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    # An automation leaves out a change from unavailable, as the entity coming back, so the event must not be one.
+    [(before, _)] = [write for write in writes if write[1] == "ready_for_pickup"]
+    assert before != "unavailable"

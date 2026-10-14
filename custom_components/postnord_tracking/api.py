@@ -38,6 +38,10 @@ _LOGGER = logging.getLogger(__name__)
 TIMEOUT = aiohttp.ClientTimeout(total=20)
 
 
+# The OAuth errors that mean the login itself is gone, and only a new one helps.
+REFUSED_GRANTS = ("invalid_grant", "invalid_client", "unauthorized_client")
+
+
 class PostNordError(Exception):
     """PostNord couldn't be reached, or it answered with an error."""
 
@@ -119,14 +123,15 @@ class PostNordLogin:
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             raise PostNordError(f"PostNord couldn't be reached for the login: {err}") from err
 
-        if status >= 500:
-            raise PostNordError(f"PostNord couldn't complete the login (status {status})")
         tokens = body if isinstance(body, dict) else {}
         access_token, refresh_token = tokens.get("access_token"), tokens.get("refresh_token")
-        # An expired or already used code is a 400 invalid_grant.
-        if not (isinstance(access_token, str) and access_token and isinstance(refresh_token, str) and refresh_token):
-            raise PostNordAuthError(f"PostNord didn't accept the login code (status {status})")
-        return access_token, refresh_token
+        if isinstance(access_token, str) and access_token and isinstance(refresh_token, str) and refresh_token:
+            return access_token, refresh_token
+        # An expired or already used code is a 400 invalid_grant. Anything else, such as a busy server, is no reason to
+        # tell the user their code was wrong.
+        if tokens.get("error") in REFUSED_GRANTS:
+            raise PostNordAuthError(f"PostNord didn't accept the login code ({tokens.get('error')})")
+        raise PostNordError(f"PostNord couldn't complete the login (status {status})")
 
 
 class PostNordClient:
@@ -157,7 +162,7 @@ class PostNordClient:
         """The email address of the logged-in account, from OpenID userinfo."""
         info = await self._get(USERINFO_URL, {}, gateway=False)
         info = info if isinstance(info, dict) else {}
-        found = info.get("email") or info.get("username")
+        found = info.get("email") or info.get("preferred_username")
         if not isinstance(found, str) or not found.strip():
             raise PostNordError("PostNord didn't tell the account's email address")
         return found.strip()
@@ -178,8 +183,12 @@ class PostNordClient:
         if status in (401, 403):
             await self._refresh_access_token()
             status, body = await self._fetch(url, params, gateway)
-            if status in (401, 403):
+            if status == 401:
                 raise PostNordAuthError("PostNord refused the refreshed access token")
+            # A fresh token turned away with a 403 is the gateway's doing, such as a changed API key: logging in again
+            # wouldn't help, so it is an update that failed, not a login.
+            if status == 403:
+                raise PostNordError("PostNord's gateway refused the request although the access token is fresh")
         if status != 200:
             raise PostNordError(f"PostNord answered with status {status}")
         return body
@@ -225,12 +234,14 @@ class PostNordClient:
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             raise PostNordError(f"PostNord couldn't be reached for a new access token: {err}") from err
 
-        # A server error says nothing about the token: try again at the next update.
-        if status >= 500:
-            raise PostNordError(f"PostNord couldn't refresh the access token (status {status})")
         access_token = body.get("access_token") if isinstance(body, dict) else None
         if not isinstance(access_token, str) or not access_token:
-            raise PostNordAuthError("PostNord didn't give a new access token")
+            # Only these say the refresh token is gone. A server error, a 429 or a firewall says nothing about it, and
+            # the next update tries again.
+            error = body.get("error") if isinstance(body, dict) else None
+            if error in REFUSED_GRANTS:
+                raise PostNordAuthError(f"PostNord no longer accepts the refresh token ({error})")
+            raise PostNordError(f"PostNord couldn't refresh the access token (status {status})")
 
         self._access_token = access_token
         # A rotated refresh token has to replace the old one, or the next refresh fails.

@@ -16,7 +16,7 @@ SETTINGS = PackageSettings(
     max_shipments=5,
     stale_shipment_day_limit=15,
     completed_shipment_days_shown=3,
-    include_pickup_details=False,
+    pickup_code="none",
 )
 
 
@@ -66,7 +66,7 @@ def test_active_and_archived_parcels_are_both_listed() -> None:
 def test_package_attributes() -> None:
     _, ready, _delivered_no_events, _ = build_packages(tracking(), SETTINGS, NOW).packages
     assert ready == {
-        "origin": "Verkkokauppa.com",
+        "origin": "Example Shop",
         "origin_city": "Stockholm",
         "destination": None,
         "destination_city": "Tampere",
@@ -84,6 +84,7 @@ def test_package_attributes() -> None:
         "package_count": 1,
         "pickup_point": None,
         "pickup_code": None,
+        "pickup_qr": None,
         "source": "PostNord",
         "tracking_url": "https://tracking.postnord.com/?id=PN0001",
     }
@@ -143,14 +144,16 @@ def test_a_package_carries_what_postnord_knows_of_it() -> None:
     assert package["package_count"] == 2
 
 
-def test_the_pickup_point_and_its_code_are_left_out_unless_asked_for() -> None:
+def test_the_pickup_point_is_always_there_but_the_code_only_when_asked_for() -> None:
     [package] = build_packages(tracking(active=[with_details()], archived=[]), SETTINGS, NOW).packages
-    assert package["pickup_point"] is None
+    assert package["pickup_point"]["name"] == "PostNord Service Point"
     assert package["pickup_code"] is None
+    assert package["pickup_qr"] is None
 
 
-def test_the_pickup_point_and_its_code_when_asked_for() -> None:
-    settings = replace(SETTINGS, include_pickup_details=True)
+def test_the_pickup_point_and_no_code_even_when_asked_for() -> None:
+    """A collectCode on the parcel is the key of the code's lookup, not the code, so it is never shown as one."""
+    settings = replace(SETTINGS, pickup_code="code")
     [package] = build_packages(tracking(active=[with_details()], archived=[]), settings, NOW).packages
     assert package["pickup_point"] == {
         "name": "PostNord Service Point",
@@ -161,4 +164,28 @@ def test_the_pickup_point_and_its_code_when_asked_for() -> None:
         "available": None,
     }
     assert package["destination"] == "PostNord Service Point"
-    assert package["pickup_code"] == "12345678"
+    assert package["pickup_code"] is None
+
+
+def test_the_counts_and_events_see_every_package_not_only_the_listed_ones() -> None:
+    moving = [shipment(f"PN03{n}", "EN_ROUTE", f"2026-09-16T0{n}:00:00Z") for n in range(1, 4)]
+    stale = shipment("PN0399", "EN_ROUTE", "2026-08-01T05:00:00Z")
+    packages = build_packages(tracking(active=[*moving, stale], archived=[]), replace(SETTINGS, max_shipments=2), NOW)
+    assert len(packages.packages) == 2
+    assert len(packages.current) == 3, "a count covers all of them, but not one gone stale"
+    assert len(packages.every) == 4, "events follow every package, stale ones too"
+
+
+def test_a_parcel_both_active_and_archived_is_kept_once_as_its_newest_copy() -> None:
+    newer = shipment("PN0600", "DELIVERED", "2026-09-16T08:30:00Z")
+    older = shipment("PN0600", "EN_ROUTE", "2026-09-16T05:30:00Z")
+    for active, archived in (([newer], [older]), ([older], [newer])):
+        packages = build_packages(tracking(active=active, archived=archived), SETTINGS, NOW)
+        assert [package["status"] for package in packages.every] == [0]
+
+
+def test_the_event_country_is_where_it_happened() -> None:
+    moved = shipment("PN0700", "EN_ROUTE", "2026-09-16T08:30:00Z")
+    moved["items"][0]["events"][-1]["location"] = {"name": "Malmö", "countryCode": "SE"}
+    [package] = build_packages(tracking(active=[moved], archived=[]), SETTINGS, NOW).packages
+    assert package["latest_event_country"] == "SE"

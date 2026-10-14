@@ -32,21 +32,22 @@ from .api import PostNordAuthError, PostNordClient, PostNordError, PostNordLogin
 from .const import (
     CONF_ACCESS_TOKEN,
     CONF_COMPLETED_SHIPMENT_DAYS_SHOWN,
-    CONF_INCLUDE_PICKUP_DETAILS,
     CONF_LANGUAGE,
     CONF_MAX_SHIPMENTS,
+    CONF_PICKUP_CODE,
     CONF_PRIORITIZE_UNDELIVERED,
     CONF_REDIRECT_URL,
     CONF_REFRESH_TOKEN,
     CONF_STALE_SHIPMENT_DAY_LIMIT,
     CONF_USERNAME,
     DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN,
-    DEFAULT_INCLUDE_PICKUP_DETAILS,
     DEFAULT_MAX_SHIPMENTS,
+    DEFAULT_PICKUP_CODE,
     DEFAULT_PRIORITIZE_UNDELIVERED,
     DEFAULT_STALE_SHIPMENT_DAY_LIMIT,
     DOMAIN,
     LANGUAGES,
+    PICKUP_CODE_OPTIONS,
 )
 
 DAYS_SELECTOR = NumberSelector(NumberSelectorConfig(min=0, max=365, step=1, mode=NumberSelectorMode.BOX))
@@ -61,7 +62,9 @@ SETTINGS_SCHEMA = vol.Schema(
         vol.Required(CONF_MAX_SHIPMENTS): NumberSelector(NumberSelectorConfig(min=1, max=50, step=1, mode=NumberSelectorMode.BOX)),
         vol.Required(CONF_STALE_SHIPMENT_DAY_LIMIT): DAYS_SELECTOR,
         vol.Required(CONF_COMPLETED_SHIPMENT_DAYS_SHOWN): DAYS_SELECTOR,
-        vol.Required(CONF_INCLUDE_PICKUP_DETAILS): BooleanSelector(),
+        vol.Required(CONF_PICKUP_CODE): SelectSelector(
+            SelectSelectorConfig(options=PICKUP_CODE_OPTIONS, translation_key=CONF_PICKUP_CODE, mode=SelectSelectorMode.DROPDOWN)
+        ),
     }
 )
 
@@ -76,7 +79,9 @@ def clean_settings(user_input: Mapping[str, Any]) -> dict[str, Any]:
 
 
 class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
+    # 1.1 entries have the old pickup switch. __init__.async_migrate_entry updates them.
     VERSION = 1
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         # One login per flow: the link on the form stays the same when the form is shown again,
@@ -148,7 +153,7 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_MAX_SHIPMENTS: DEFAULT_MAX_SHIPMENTS,
             CONF_STALE_SHIPMENT_DAY_LIMIT: DEFAULT_STALE_SHIPMENT_DAY_LIMIT,
             CONF_COMPLETED_SHIPMENT_DAYS_SHOWN: DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN,
-            CONF_INCLUDE_PICKUP_DETAILS: DEFAULT_INCLUDE_PICKUP_DETAILS,
+            CONF_PICKUP_CODE: DEFAULT_PICKUP_CODE,
         }
         return self.async_show_form(
             step_id="settings",

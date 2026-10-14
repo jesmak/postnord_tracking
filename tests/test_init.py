@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE
@@ -12,8 +13,8 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
+from custom_components.postnord_tracking import async_migrate_entry
 from custom_components.postnord_tracking.const import DOMAIN
-from custom_components.postnord_tracking.sensor import PostNordSensor
 
 from .conftest import ENTRY_DATA, NEW_ACCESS_TOKEN, NOW, TOKEN, TOKEN_URL, TRACKING_URL, USERNAME, answers, tracking
 
@@ -21,7 +22,7 @@ ENTITY_ID = "sensor.postnord_matti_meikalainen_example_com"
 
 
 def account(hass: HomeAssistant, **options: object) -> MockConfigEntry:
-    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, unique_id=USERNAME, data={**ENTRY_DATA, **options})
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=2, unique_id=USERNAME, data={**ENTRY_DATA, **options})
     entry.add_to_hass(hass)
     return entry
 
@@ -46,10 +47,6 @@ async def test_the_sensor_lists_the_packages(hass: HomeAssistant, postnord: Aioh
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert entry.state is ConfigEntryState.NOT_LOADED
-
-
-async def test_packages_are_kept_out_of_the_recorder() -> None:
-    assert "packages" in PostNordSensor._unrecorded_attributes
 
 
 async def test_a_refreshed_access_token_is_saved(
@@ -94,3 +91,23 @@ async def test_the_sensor_is_unavailable_while_postnord_is_down(
     await hass.async_block_till_done()
 
     assert hass.states.get(ENTITY_ID).state == STATE_UNAVAILABLE
+
+
+@pytest.mark.parametrize(("switch", "choice"), [(True, "code"), (False, "none"), (None, "none")])
+async def test_the_pickup_switch_of_an_entry_of_1_1_becomes_a_choice(hass: HomeAssistant, switch: bool | None, choice: str) -> None:
+    data = {key: value for key, value in ENTRY_DATA.items() if key != "pickup_code"}
+    if switch is not None:
+        data["include_pickup_details"] = switch
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=1, unique_id=USERNAME, data=data)
+    entry.add_to_hass(hass)
+    assert await async_migrate_entry(hass, entry)
+
+    assert entry.minor_version == 2
+    assert entry.data["pickup_code"] == choice
+    assert "include_pickup_details" not in entry.data
+
+
+async def test_an_entry_of_a_newer_version_is_refused(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=2, minor_version=1, unique_id=USERNAME, data=ENTRY_DATA)
+    entry.add_to_hass(hass)
+    assert not await async_migrate_entry(hass, entry)

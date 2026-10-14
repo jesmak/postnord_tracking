@@ -8,7 +8,7 @@
           "redirect_url": "Kirjautumisosoite"
         },
         "data_description": {
-          "redirect_url": "Liitä se ja jatka muutaman minuutin sisällä; sen koodi toimii vain kerran."
+          "redirect_url": "Liitä se ja jatka muutaman minuutin sisällä. Sen koodi toimii vain kerran."
         }
       },
       "settings": {
@@ -20,7 +20,7 @@
           "max_shipments": "Pakettien enimmäismäärä",
           "stale_shipment_day_limit": "Montako päivää toimittamattomat näkyvät",
           "completed_shipment_day_shown": "Montako päivää toimitetut näkyvät",
-          "include_pickup_details": "Noutopaikka ja -koodi"
+          "pickup_code": "Noutokoodi"
         },
         "data_description": {
           "language": "Pakettitapahtumien kuvausten kieli.",
@@ -28,7 +28,7 @@
           "max_shipments": "Montako pakettia sensori listaa.",
           "stale_shipment_day_limit": "Lasketaan paketin viimeisimmästä tapahtumasta. Osa paketeista jää ikuisesti toimitukseen.",
           "completed_shipment_day_shown": "Lasketaan toimituksesta.",
-          "include_pickup_details": "Lisää noutopaikan ja -koodin pakettitietoihin. Oletuksena pois, koska tieto on arkaluontoista."
+          "pickup_code": "Koodi paketin noutamista varten. Oletuksena pois päältä, koska tieto on arkaluontoista."
         }
       },
       "reauth_confirm": {
@@ -38,7 +38,7 @@
           "redirect_url": "Kirjautumisosoite"
         },
         "data_description": {
-          "redirect_url": "Liitä se ja jatka muutaman minuutin sisällä; sen koodi toimii vain kerran."
+          "redirect_url": "Liitä se ja jatka muutaman minuutin sisällä. Sen koodi toimii vain kerran."
         }
       },
       "reconfigure": {
@@ -58,7 +58,7 @@
           "max_shipments": "Pakettien enimmäismäärä",
           "stale_shipment_day_limit": "Montako päivää toimittamattomat näkyvät",
           "completed_shipment_day_shown": "Montako päivää toimitetut näkyvät",
-          "include_pickup_details": "Noutopaikka ja -koodi"
+          "pickup_code": "Noutokoodi"
         },
         "data_description": {
           "language": "Pakettitapahtumien kuvausten kieli.",
@@ -66,7 +66,7 @@
           "max_shipments": "Montako pakettia sensori listaa.",
           "stale_shipment_day_limit": "Lasketaan paketin viimeisimmästä tapahtumasta. Osa paketeista jää ikuisesti toimitukseen.",
           "completed_shipment_day_shown": "Lasketaan toimituksesta.",
-          "include_pickup_details": "Lisää noutopaikan ja -koodin pakettitietoihin."
+          "pickup_code": "Koodi paketin noutamista varten."
         }
       },
       "reconfigure_login": {
@@ -76,12 +76,12 @@
           "redirect_url": "Kirjautumisosoite"
         },
         "data_description": {
-          "redirect_url": "Liitä se ja jatka muutaman minuutin sisällä; sen koodi toimii vain kerran."
+          "redirect_url": "Liitä se ja jatka muutaman minuutin sisällä. Sen koodi toimii vain kerran."
         }
       }
     },
     "error": {
-      "invalid_auth": "PostNord ei hyväksynyt kirjautumista. Koodi vanhenee minuuteissa ja toimii vain kerran: kirjaudu uudelleen linkistä ja liitä uusi osoite heti.",
+      "invalid_auth": "PostNord ei hyväksynyt kirjautumista. Koodi vanhenee minuuteissa ja toimii vain kerran. Kirjaudu uudelleen linkistä ja liitä uusi osoite heti.",
       "no_code": "Tämä ei ole kirjautumisosoite. Kopioi koko osoite, joka alkaa com.postnord.app://redirect?code=.",
       "wrong_state": "Osoite on toisesta kirjautumisesta. Käytä tämän lomakkeen linkkiä.",
       "wrong_account": "Kirjauduit toiselle PostNord-tilille. Kirjaudu tilille {username}.",
@@ -101,6 +101,12 @@
         "nb": "Norsk",
         "da": "Dansk",
         "en": "English"
+      }
+    },
+    "pickup_code": {
+      "options": {
+        "none": "Ei lisätä",
+        "code": "Lisätään"
       }
     }
   },
@@ -128,6 +134,11 @@
       "ready_for_pickup": {
         "name": "Paketteja noudettavissa"
       }
+    }
+  },
+  "device": {
+    "account": {
+      "name": "PostNord ({username})"
     }
   }
 }

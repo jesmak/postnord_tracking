@@ -17,15 +17,16 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_COMPLETED_SHIPMENT_DAYS_SHOWN,
-    CONF_INCLUDE_PICKUP_DETAILS,
     CONF_MAX_SHIPMENTS,
+    CONF_PICKUP_CODE,
     CONF_PRIORITIZE_UNDELIVERED,
     CONF_STALE_SHIPMENT_DAY_LIMIT,
     DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN,
-    DEFAULT_INCLUDE_PICKUP_DETAILS,
     DEFAULT_MAX_SHIPMENTS,
+    DEFAULT_PICKUP_CODE,
     DEFAULT_PRIORITIZE_UNDELIVERED,
     DEFAULT_STALE_SHIPMENT_DAY_LIMIT,
+    PICKUP_CODE_CODE,
     TRACKING_URL,
 )
 
@@ -66,8 +67,9 @@ class PackageSettings:
     # Undelivered packages whose latest event is older are hidden: some stay in delivery for good.
     stale_shipment_day_limit: int
     completed_shipment_days_shown: int
-    # The pickup point and the code that collects the package, which not everyone wants on a dashboard.
-    include_pickup_details: bool
+    # none or code: the code collects the package, which not everyone wants on a dashboard. The pickup point itself is
+    # always included.
+    pickup_code: str
 
     @classmethod
     def from_data(cls, data: Mapping[str, Any]) -> PackageSettings:
@@ -76,7 +78,7 @@ class PackageSettings:
             max_shipments=int(data.get(CONF_MAX_SHIPMENTS, DEFAULT_MAX_SHIPMENTS)),
             stale_shipment_day_limit=int(data.get(CONF_STALE_SHIPMENT_DAY_LIMIT, DEFAULT_STALE_SHIPMENT_DAY_LIMIT)),
             completed_shipment_days_shown=int(data.get(CONF_COMPLETED_SHIPMENT_DAYS_SHOWN, DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN)),
-            include_pickup_details=bool(data.get(CONF_INCLUDE_PICKUP_DETAILS, DEFAULT_INCLUDE_PICKUP_DETAILS)),
+            pickup_code=str(data.get(CONF_PICKUP_CODE, DEFAULT_PICKUP_CODE)),
         )
 
 
@@ -84,7 +86,12 @@ class PackageSettings:
 class Packages:
     # When a shipment of the account last changed, hidden ones included. None when there are none.
     latest_change: datetime | None
+    # The packages to list, newest first and at most the maximum.
     packages: list[dict[str, Any]]
+    # Every package within the age limits, however many: the counts.
+    current: list[dict[str, Any]]
+    # Every package of the account: what happens to them, also outside the list.
+    every: list[dict[str, Any]]
 
 
 def map_status(raw_status: Any) -> int:
@@ -107,6 +114,7 @@ def build_packages(tracking: Mapping[str, Any], settings: PackageSettings, now: 
     undelivered: list[tuple[datetime, dict[str, Any]]] = []
     completed: list[tuple[datetime, dict[str, Any]]] = []
 
+    newest: dict[str, tuple[datetime, dict[str, Any]]] = {}
     for shipment in shipments:
         changed = status_change_time(shipment)
         if changed is None:
@@ -114,20 +122,34 @@ def build_packages(tracking: Mapping[str, Any], settings: PackageSettings, now: 
         if latest_change is None or changed > latest_change:
             latest_change = changed
 
-        built = package(shipment, changed, settings)
-        status = built["status"]
+        keep_newest(newest, changed, package(shipment, changed, settings))
+
+    every = [item for _, item in newest.values()]
+    for changed, item in newest.values():
+        status = item["status"]
         age_days = (now - changed).days
         if status not in COMPLETED_STATUSES and age_days <= settings.stale_shipment_day_limit:
-            undelivered.append((changed, built))
+            undelivered.append((changed, item))
         elif status in COMPLETED_STATUSES and age_days <= settings.completed_shipment_days_shown:
-            completed.append((changed, built))
+            completed.append((changed, item))
 
     undelivered.sort(key=change_time, reverse=True)
     completed.sort(key=change_time, reverse=True)
     ordered = undelivered + completed
     if not settings.prioritize_undelivered:
         ordered.sort(key=change_time, reverse=True)
-    return Packages(latest_change, [item for _, item in ordered[: settings.max_shipments]])
+    current = [item for _, item in ordered]
+    return Packages(latest_change, current[: settings.max_shipments], current, every)
+
+
+def keep_newest(newest: dict[str, tuple[datetime, dict[str, Any]]], changed: datetime, item: dict[str, Any]) -> None:
+    """Keeps a package by its number, the newest copy when the account lists one twice. One without a number is left out,
+    since nothing would tell its updates apart from another's."""
+    number = item.get("shipment_number")
+    if not number:
+        return
+    if number not in newest or changed > newest[number][0]:
+        newest[number] = (changed, item)
 
 
 def change_time(item: tuple[datetime, dict[str, Any]]) -> datetime:
@@ -189,7 +211,8 @@ def package(shipment: Mapping[str, Any], changed: datetime, settings: PackageSet
         "raw_status": raw_status,
         "latest_event": event.get("eventDescription") or text_of(item.get("statusText")),
         "latest_event_city": location.get("city") or location.get("locationName"),
-        "latest_event_country": consignee.get("countryCode"),
+        # Where the event happened, and the receiver's country when PostNord doesn't say.
+        "latest_event_country": location.get("countryCode") or consignee.get("countryCode"),
         "latest_event_date": changed.isoformat(),
         # Only on active parcels; absent (None) on delivered ones. Field names are tentative
         # until an active parcel is captured.
@@ -197,8 +220,10 @@ def package(shipment: Mapping[str, Any], changed: datetime, settings: PackageSet
         "pickup_deadline": None,
         "weight": number(measure(item.get("weight"))),
         "package_count": item_count(shipment),
-        "pickup_point": pickup_point(point, consignee) if settings.include_pickup_details else None,
-        "pickup_code": pickup_code(shipment) if settings.include_pickup_details else None,
+        "pickup_point": pickup_point(point, consignee),
+        # Only a setting that asks for the code shows it: an unknown value keeps it out, as the code is a secret.
+        "pickup_code": pickup_code(shipment) if settings.pickup_code == PICKUP_CODE_CODE else None,
+        "pickup_qr": None,
         "source": "PostNord",
         "tracking_url": tracking_url(shipment_number),
     }
@@ -243,14 +268,16 @@ def pickup_point(point: Mapping[str, Any], consignee: Mapping[str, Any]) -> dict
         "type": point.get("type"),
         "available": point.get("openingHours") or None,
     }
-    return found if any(value for value in found.values()) else None
+    # Without a name it is no pickup point, only the receiver's city: a home delivery has nothing else.
+    return found if found["name"] else None
 
 
 def pickup_code(shipment: Mapping[str, Any]) -> str | None:
-    """The code that collects the package. PostNord serves it behind a strong-auth (levelled-up)
-    token via a separate call, so it is not in this response yet — left for a later version."""
-    code = shipment.get("collectCode")
-    return str(code) if code else None
+    """The code that collects the package, which the integration can't get yet.
+
+    PostNord serves it behind a strong-auth (levelled-up) token, from collectcode/{collectCode}. So a collectCode on the
+    parcel would be the key of that lookup, not the code, and must not be shown as one. Left for a later version."""
+    return None
 
 
 def number(value: Any) -> float | None:
