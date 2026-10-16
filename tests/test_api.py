@@ -8,8 +8,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.postnord_tracking.api import PostNordAuthError, PostNordClient, PostNordError
-from custom_components.postnord_tracking.const import API_KEY, CLIENT_ID, USERINFO_URL
+from custom_components.postnord_tracking.api import PostNordAuthError, PostNordClient, PostNordError, revoke
+from custom_components.postnord_tracking.const import API_KEY, CLIENT_ID, REVOKE_URL, USERINFO_URL
 
 from .conftest import (
     ACCESS_TOKEN,
@@ -114,6 +114,25 @@ async def test_a_refresh_that_fails_otherwise_is_tried_again_later(
     assert not isinstance(error.value, PostNordAuthError)
 
 
+@pytest.mark.parametrize("body", ["", "<html><body>Unauthorized</body></html>"])
+async def test_a_refresh_refused_with_401_needs_a_new_login_whatever_its_body(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, body: str
+) -> None:
+    aioclient_mock.get(TRACKING_URL, status=401)
+    aioclient_mock.post(TOKEN_URL, status=401, text=body)
+    with pytest.raises(PostNordAuthError):
+        await client(hass).tracking()
+
+
+async def test_a_refresh_answered_with_a_page_says_so(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    # Such as a firewall's page: nothing about the token, so the next update tries again.
+    aioclient_mock.get(TRACKING_URL, status=401)
+    aioclient_mock.post(TOKEN_URL, status=400, text="<html><body>Bad request</body></html>")
+    with pytest.raises(PostNordError, match="status 400, not JSON") as error:
+        await client(hass).tracking()
+    assert not isinstance(error.value, PostNordAuthError)
+
+
 @pytest.mark.parametrize(("tracking_status", "token_status"), [(503, None), (401, 502)])
 async def test_server_errors_are_not_token_problems(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, tracking_status: int, token_status: int | None
@@ -138,10 +157,34 @@ async def test_an_unexpected_response(hass: HomeAssistant, aioclient_mock: Aioht
         await client(hass).tracking()
 
 
-async def test_the_account_email_comes_from_userinfo(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+@pytest.mark.parametrize(
+    "answer",
+    [{"fault": "Gateway timeout"}, {"activeShipments": None, "archivedShipments": []}, {"activeShipments": []}],
+)
+async def test_an_answer_without_the_parcel_lists_is_no_empty_account(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, answer: dict
+) -> None:
+    aioclient_mock.get(TRACKING_URL, json=answer)
+    with pytest.raises(PostNordError, match="without its parcel lists"):
+        await client(hass).tracking()
+
+
+async def test_an_error_in_the_answer_is_quoted(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    aioclient_mock.get(TRACKING_URL, json={"fault": "Gateway timeout"})
+    with pytest.raises(PostNordError, match="fault 'Gateway timeout'"):
+        await client(hass).tracking()
+
+
+async def test_an_answer_that_is_not_json(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    aioclient_mock.get(TRACKING_URL, text="<html><body>Maintenance</body></html>")
+    with pytest.raises(PostNordError, match="something other than JSON"):
+        await client(hass).tracking()
+
+
+async def test_the_account_comes_from_userinfo(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     aioclient_mock.get(USERINFO_URL, json=USERINFO)
 
-    assert await client(hass).email() == USERINFO["email"]
+    assert await client(hass).account() == (USERINFO["email"], USERINFO["sub"])
 
     [(_method, url, _data, headers)] = aioclient_mock.mock_calls
     assert "apikey" not in url.query, "the gateway key is only for the API gateway"
@@ -153,4 +196,26 @@ async def test_userinfo_without_an_email(hass: HomeAssistant, aioclient_mock: Ai
     aioclient_mock.get(USERINFO_URL, json={"sub": "user-1"})
 
     with pytest.raises(PostNordError):
-        await client(hass).email()
+        await client(hass).account()
+
+
+async def test_userinfo_without_a_subject(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    aioclient_mock.get(USERINFO_URL, json={"email": USERINFO["email"]})
+
+    assert await client(hass).account() == (USERINFO["email"], None)
+
+
+async def test_revoking_a_login(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    aioclient_mock.post(REVOKE_URL, text="")
+
+    await revoke(async_get_clientsession(hass), REFRESH_TOKEN)
+
+    [(_method, _url, posted, _headers)] = aioclient_mock.mock_calls
+    assert posted == {"token": REFRESH_TOKEN, "token_type_hint": "refresh_token", "client_id": CLIENT_ID}
+
+
+async def test_a_revocation_that_fails(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    aioclient_mock.post(REVOKE_URL, status=400, json={"error": "unsupported_token_type"})
+
+    with pytest.raises(PostNordError, match="unsupported_token_type"):
+        await revoke(async_get_clientsession(hass), REFRESH_TOKEN)

@@ -11,6 +11,7 @@ in again. Reconfiguring offers a choice: change the settings, or log in again.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any
 
@@ -39,6 +40,7 @@ from .const import (
     CONF_REDIRECT_URL,
     CONF_REFRESH_TOKEN,
     CONF_STALE_SHIPMENT_DAY_LIMIT,
+    CONF_SUBJECT,
     CONF_USERNAME,
     DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN,
     DEFAULT_MAX_SHIPMENTS,
@@ -49,6 +51,8 @@ from .const import (
     LANGUAGES,
     PICKUP_CODE_OPTIONS,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 DAYS_SELECTOR = NumberSelector(NumberSelectorConfig(min=0, max=365, step=1, mode=NumberSelectorMode.BOX))
 
@@ -78,6 +82,15 @@ def clean_settings(user_input: Mapping[str, Any]) -> dict[str, Any]:
     return data
 
 
+def same_account(entry: ConfigEntry, email: str, subject: str | None) -> bool:
+    """Whether a login is of the account an entry follows: by the account's subject when both have one, as an email can
+    change, and by the email the entry was set up with otherwise."""
+    saved = entry.data.get(CONF_SUBJECT)
+    if saved and subject:
+        return subject == saved
+    return email.lower() == entry.unique_id
+
+
 class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
     # 1.1 entries have the old pickup switch. __init__.async_migrate_entry updates them.
     VERSION = 1
@@ -87,36 +100,40 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
         # One login per flow: the link on the form stays the same when the form is shown again,
         # so logging in again with it after an error works.
         self._login = PostNordLogin()
-        # The logged-in account (email and tokens), between the login and settings steps.
+        # The logged-in account (email, subject and tokens), between the login and settings steps.
         self._account: dict[str, str] = {}
 
     async def _log_in(self, pasted: str, language: str) -> dict[str, str]:
         """Exchanges the pasted redirect for tokens, and checks them by reading the parcels.
 
-        Returns the errors; on success, the account's email and tokens are in self._account.
+        Returns the errors; on success, the account's email, subject and tokens are in self._account.
         """
         session = async_get_clientsession(self.hass)
         try:
             access_token, refresh_token = await self._login.exchange(session, pasted)
             client = PostNordClient(session, access_token, refresh_token, language)
-            email = await client.email()
+            email, subject = await client.account()
             await client.tracking()
         except PostNordRedirectError as err:
             return {CONF_REDIRECT_URL: err.reason}
-        except PostNordAuthError:
+        except PostNordAuthError as err:
+            _LOGGER.warning("PostNord didn't accept the login: %s", err)
             return {"base": "invalid_auth"}
-        except PostNordError:
+        except PostNordError as err:
+            _LOGGER.warning("Logging in to PostNord failed: %s", err)
             return {"base": "cannot_connect"}
         self._account = {
             CONF_USERNAME: email,
             CONF_ACCESS_TOKEN: client.access_token,
             CONF_REFRESH_TOKEN: client.refresh_token,
         }
+        if subject:
+            self._account[CONF_SUBJECT] = subject
         return {}
 
-    def _tokens(self) -> dict[str, str]:
-        """The new tokens alone: an entry keeps its username, which its entities' ids are built from."""
-        return {key: self._account[key] for key in (CONF_ACCESS_TOKEN, CONF_REFRESH_TOKEN)}
+    def _new_login(self) -> dict[str, str]:
+        """The new tokens and the subject alone: an entry keeps its username, which its entities' ids are built from."""
+        return {key: value for key, value in self._account.items() if key != CONF_USERNAME}
 
     def _show_login(self, step_id: str, errors: dict[str, str], **placeholders: str) -> ConfigFlowResult:
         return self.async_show_form(
@@ -164,7 +181,7 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _log_in_again(self, entry: ConfigEntry, user_input: dict[str, Any]) -> dict[str, str]:
         """Logging in again to the account of an entry. Returns the errors."""
         errors = await self._log_in(user_input[CONF_REDIRECT_URL], entry.data[CONF_LANGUAGE])
-        if not errors and self._account[CONF_USERNAME].lower() != entry.unique_id:
+        if not errors and not same_account(entry, self._account[CONF_USERNAME], self._account.get(CONF_SUBJECT)):
             errors = {"base": "wrong_account"}
         return errors
 
@@ -178,7 +195,7 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             errors = await self._log_in_again(entry, user_input)
             if not errors:
-                return self.async_update_reload_and_abort(entry, data={**entry.data, **self._tokens()})
+                return self.async_update_reload_and_abort(entry, data={**entry.data, **self._new_login()})
         return self._show_login("reauth_confirm", errors, username=entry.data[CONF_USERNAME])
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -205,5 +222,5 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             errors = await self._log_in_again(entry, user_input)
             if not errors:
-                return self.async_update_reload_and_abort(entry, data={**entry.data, **self._tokens()})
+                return self.async_update_reload_and_abort(entry, data={**entry.data, **self._new_login()})
         return self._show_login("reconfigure_login", errors, username=entry.data[CONF_USERNAME])

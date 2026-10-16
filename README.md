@@ -57,7 +57,7 @@ in Home Assistant, so its last address is copied over by hand. The setup form sh
 
 The account is named after its email address, which PostNord supplies, and the settings come next. After that the
 integration renews its own access. If PostNord stops accepting it, Home Assistant asks you to log in again the same
-way.
+way. Deleting the account in Home Assistant ends its login at PostNord as well.
 
 Because it imitates the app, a change in PostNord's service can stop the integration until it is updated.
 
@@ -97,7 +97,7 @@ The `packages` attribute lists the parcels, and each package has these keys.
 | `destination`, `destination_city`           | The pickup point when PostNord names one, and the receiver's city                   |
 | `shipment_date`                             | When the parcel turned up in the account                                            |
 | `latest_event`                              | The latest event, in the chosen language                                            |
-| `latest_event_city`, `latest_event_country` | Where the latest event happened, and the receiver's country                         |
+| `latest_event_city`, `latest_event_country` | Where the latest event happened, with the receiver's country if PostNord gives none |
 | `latest_event_date`                         | When the package last changed                                                       |
 | `estimated_delivery`                        | When the package is expected, when PostNord says                                    |
 | `pickup_deadline`                           | How long it is kept at the pickup point. PostNord doesn't tell, so it is empty      |
@@ -137,7 +137,8 @@ account within the days set above, also those the list has no room for.
 
 An event entity, **Package**, fires once for everything that happens to a package, so an automation can act on it
 without watching the packages attribute. Several packages changing in one update fire one event each, packages the
-list has no room for included.
+list has no room for included. A new package that is already ready for pickup, delivered or returned when it is first
+seen fires `new_package` and then that status's event, so an automation listening for either hears of it.
 
 | Event type         | When it fires                                 |
 | ------------------ | --------------------------------------------- |
@@ -151,7 +152,8 @@ The event carries the package it happened to, with `shipment_number`, `status`, 
 `destination`, `destination_city`, `latest_event`, `latest_event_city`, `latest_event_date` and `source`.
 
 Nothing fires for the packages that are already there when Home Assistant starts, or when the integration is reloaded,
-since they have not just happened. A change while Home Assistant was off fires nothing either.
+since they have not just happened. A change while Home Assistant was off fires nothing either. A package missing from
+one of PostNord's answers and back in the next is compared with how it was, not reported as new.
 
 ## Examples
 
@@ -220,9 +222,9 @@ python3.14 -m venv .venv
 
 | Path                           | What it contains                                                           |
 | ------------------------------ | -------------------------------------------------------------------------- |
-| `__init__.py`                  | Setup, and moving entries of earlier versions                              |
+| `__init__.py`                  | Setup, removal, and moving entries of earlier versions                     |
 | `config_flow.py`               | Logging in, logging in again and changing settings                         |
-| `api.py`                       | The app's login, the parcels query and renewing tokens                     |
+| `api.py`                       | The app's login, the parcels query, renewing and revoking tokens           |
 | `coordinator.py`               | Fetching the packages every 10 minutes                                     |
 | `shipments.py`                 | Turning parcels into the sensor's packages                                 |
 | `sensor.py`                    | The sensors, the account's own and the counts                              |

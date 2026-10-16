@@ -23,8 +23,10 @@ USER_AGENT: Final = "okhttp/4.12.0"
 # copies the redirect URL from the browser's developer tools and pastes it into the config flow.
 AUTHORIZE_URL: Final = "https://account.postnord.com/auth"
 TOKEN_URL: Final = "https://account.postnord.com/oauth2/token"
-# OpenID userinfo: the account's email address, which names the account in Home Assistant.
+# OpenID userinfo: the account's email address, which names the account in Home Assistant, and its subject.
 USERINFO_URL: Final = "https://account.postnord.com/userinfo"
+# Revoking the refresh token when the entry is removed, so a copy of it left in backups can no longer log in.
+REVOKE_URL: Final = "https://account.postnord.com/oauth2/revoke"
 CLIENT_ID: Final = "receiverappprod3gvTgY5ATtYWZZy"
 REDIRECT_URI: Final = "com.postnord.app://redirect"
 SCOPES: Final = [
@@ -45,6 +47,8 @@ LANGUAGES: Final = ["fi", "sv", "nb", "da", "en"]
 CONF_USERNAME: Final = "username"
 CONF_ACCESS_TOKEN: Final = "access_token"
 CONF_REFRESH_TOKEN: Final = "refresh_token"
+# The account's OpenID subject, which stays the same when its email changes. Saved by every login since 1.2.0.
+CONF_SUBJECT: Final = "subject"
 # Only in the forms: the pasted redirect URL, exchanged for the tokens above.
 CONF_REDIRECT_URL: Final = "redirect_url"
 CONF_LANGUAGE: Final = "language"

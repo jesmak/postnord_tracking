@@ -181,7 +181,7 @@ def test_a_parcel_both_active_and_archived_is_kept_once_as_its_newest_copy() -> 
     older = shipment("PN0600", "EN_ROUTE", "2026-09-16T05:30:00Z")
     for active, archived in (([newer], [older]), ([older], [newer])):
         packages = build_packages(tracking(active=active, archived=archived), SETTINGS, NOW)
-        assert [package["status"] for package in packages.every] == [0]
+        assert {number: package["status"] for number, package in packages.every.items()} == {"PN0600": 0}
 
 
 def test_the_event_country_is_where_it_happened() -> None:
@@ -189,3 +189,37 @@ def test_the_event_country_is_where_it_happened() -> None:
     moved["items"][0]["events"][-1]["location"] = {"name": "Malmö", "countryCode": "SE"}
     [package] = build_packages(tracking(active=[moved], archived=[]), SETTINGS, NOW).packages
     assert package["latest_event_country"] == "SE"
+
+
+@pytest.mark.parametrize(("delivered", "shown"), [("2026-09-13T10:00:00Z", True), ("2026-09-13T08:00:00Z", False)])
+def test_the_days_shown_are_counted_from_the_exact_time(delivered: str, shown: bool) -> None:
+    # Three days before NOW is 2026-09-13 09:00, so an hour more is past the limit of three.
+    parcel = shipment("PN0800", "DELIVERED", delivered)
+    packages = build_packages(tracking(active=[], archived=[parcel]), SETTINGS, NOW)
+    assert numbers(packages) == (["PN0800"] if shown else [])
+
+
+@pytest.mark.parametrize(("changed", "shown"), [("2026-09-01T10:00:00Z", True), ("2026-09-01T08:00:00Z", False)])
+def test_the_stale_limit_is_counted_from_the_exact_time(changed: str, shown: bool) -> None:
+    parcel = shipment("PN0810", "EN_ROUTE", changed)
+    packages = build_packages(tracking(active=[parcel], archived=[]), SETTINGS, NOW)
+    assert numbers(packages) == (["PN0810"] if shown else [])
+
+
+def test_a_null_among_the_items_is_left_out() -> None:
+    parcel = shipment("PN0900", "EN_ROUTE", "2026-09-16T08:30:00Z", event="Lähetys on kuljetuksessa")
+    parcel["items"] = [None, *parcel["items"]]
+    [package] = build_packages(tracking(active=[parcel], archived=[]), SETTINGS, NOW).packages
+    assert package["latest_event"] == "Lähetys on kuljetuksessa"
+    assert package["latest_event_date"] == "2026-09-16T08:30:00+00:00"
+    assert package["package_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("hours", "available"), [("Mon-Fri 8-20", "Mon-Fri 8-20"), ([{"day": "MONDAY", "open": "08:00"}], None), ("", None)]
+)
+def test_opening_hours_are_passed_on_only_as_text(hours: Any, available: str | None) -> None:
+    parcel = with_details()
+    parcel["destinationDeliveryPoint"]["openingHours"] = hours
+    [package] = build_packages(tracking(active=[parcel], archived=[]), SETTINGS, NOW).packages
+    assert package["pickup_point"]["available"] == available

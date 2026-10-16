@@ -163,3 +163,84 @@ async def test_an_event_after_a_failed_update_does_not_come_from_unavailable(
     # An automation leaves out a change from unavailable, as the entity coming back, so the event must not be one.
     [(before, _)] = [write for write in writes if write[1] == "ready_for_pickup"]
     assert before != "unavailable"
+
+
+def event_types(hass: HomeAssistant) -> list[str]:
+    """The event types the event entity writes from now on."""
+    seen: list[str] = []
+    hass.bus.async_listen(
+        "state_changed",
+        lambda call: (
+            seen.append(call.data["new_state"].attributes.get("event_type"))
+            if call.data["entity_id"] == EVENT_ENTITY and call.data["new_state"]
+            else None
+        ),
+    )
+    return seen
+
+
+async def next_update(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    freezer.tick(timedelta(minutes=11))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+
+async def test_a_package_missing_from_one_answer_is_not_new_when_it_comes_back(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer: FrozenDateTimeFactory
+) -> None:
+    both = [
+        shipment("PN0301", "EN_ROUTE", "2026-09-16T08:30:00Z", event="Lähetys on kuljetuksessa"),
+        shipment("PN0302", "EN_ROUTE", "2026-09-16T08:40:00Z", event="Lähetys on kuljetuksessa"),
+    ]
+    parcels = list(both)
+    aioclient_mock.post(TOKEN_URL, json={"access_token": "t"})
+    aioclient_mock.get(TRACKING_URL, side_effect=lambda *_: answer(parcels))
+    await set_up(hass, freezer)
+    seen = event_types(hass)
+
+    parcels[:] = both[:1]
+    await next_update(hass, freezer)
+    parcels[:] = both
+    await next_update(hass, freezer)
+
+    assert seen == [], "nothing happened to the packages"
+
+
+async def test_an_answer_without_its_parcel_lists_fires_nothing_after_it(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer: FrozenDateTimeFactory
+) -> None:
+    parcels = [shipment("PN0401", "EN_ROUTE", "2026-09-16T08:30:00Z", event="Lähetys on kuljetuksessa")]
+    broken = False
+
+    async def reply(*_: Any) -> AiohttpClientMockResponse:
+        if broken:
+            return AiohttpClientMockResponse("get", TRACKING_URL, json={"fault": "Gateway timeout"})
+        return await answer(parcels)
+
+    aioclient_mock.post(TOKEN_URL, json={"access_token": "t"})
+    aioclient_mock.get(TRACKING_URL, side_effect=reply)
+    await set_up(hass, freezer)
+    seen = event_types(hass)
+
+    broken = True
+    await next_update(hass, freezer)
+    assert hass.states.get(ON_THE_WAY).state == "unavailable", "a broken answer is a failed update, not an empty account"
+    broken = False
+    await next_update(hass, freezer)
+
+    assert "new_package" not in seen
+
+
+async def test_a_package_first_seen_at_its_pickup_point_fires_both_events(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer: FrozenDateTimeFactory
+) -> None:
+    parcels: list[dict[str, Any]] = []
+    aioclient_mock.post(TOKEN_URL, json={"access_token": "t"})
+    aioclient_mock.get(TRACKING_URL, side_effect=lambda *_: answer(parcels))
+    await set_up(hass, freezer)
+    seen = event_types(hass)
+
+    parcels[:] = [shipment("PN0501", "AVAILABLE_FOR_DELIVERY", "2026-09-16T11:30:00Z")]
+    await next_update(hass, freezer)
+
+    assert [event for event in seen if event] == ["new_package", "ready_for_pickup"]

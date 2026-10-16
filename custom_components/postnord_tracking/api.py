@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
 import re
 import secrets
@@ -27,6 +28,7 @@ from .const import (
     CONTEXT,
     PATH_TRACKING,
     REDIRECT_URI,
+    REVOKE_URL,
     SCOPES,
     TOKEN_URL,
     USER_AGENT,
@@ -40,6 +42,12 @@ TIMEOUT = aiohttp.ClientTimeout(total=20)
 
 # The OAuth errors that mean the login itself is gone, and only a new one helps.
 REFUSED_GRANTS = ("invalid_grant", "invalid_client", "unauthorized_client")
+
+# The parcel lists of a tracking answer. An answer without them is no account with no parcels.
+SHIPMENT_LISTS = ("activeShipments", "archivedShipments")
+
+# Where an answer that isn't what was asked for may say why.
+ERROR_FIELDS = ("error", "error_description", "message", "fault")
 
 
 class PostNordError(Exception):
@@ -66,6 +74,61 @@ def _b64(raw: bytes) -> str:
 def _query_value(text: str, name: str) -> str | None:
     match = re.search(rf"[?&]{name}=([^&#\s\"']+)", text)
     return unquote(match.group(1)) if match else None
+
+
+def _why(body: Any) -> str:
+    """What an unexpected answer says about itself, for the error message."""
+    if not isinstance(body, dict):
+        return ""
+    said = [f"{key} {str(body[key])[:200]!r}" for key in ERROR_FIELDS if body.get(key)]
+    return f": {', '.join(said)}" if said else ""
+
+
+async def _token_post(session: aiohttp.ClientSession, url: str, data: dict[str, str], purpose: str) -> tuple[int, dict[str, Any] | None]:
+    """A form POST to PostNord's OAuth server. The body is None when it isn't a JSON object, such as an empty 401 or a
+    firewall's HTML page."""
+    try:
+        async with session.post(
+            url,
+            data=data,
+            headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+            timeout=TIMEOUT,
+        ) as response:
+            status = response.status
+            text = await response.text()
+    except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+        raise PostNordError(f"PostNord couldn't be reached {purpose}: {err}") from err
+    try:
+        body = json.loads(text)
+    except ValueError:
+        body = None
+    return status, body if isinstance(body, dict) else None
+
+
+def _refused(status: int, body: dict[str, Any] | None) -> str | None:
+    """Why the OAuth server refused the login for good, or None when it may work on another try. A 401 is the client or
+    the token being refused, whether or not its body says so."""
+    error = body.get("error") if body else None
+    if error in REFUSED_GRANTS:
+        return str(error)
+    return "status 401" if status == 401 else None
+
+
+def _status(status: int, body: dict[str, Any] | None) -> str:
+    return f"status {status}" + ("" if body is not None else ", not JSON")
+
+
+async def revoke(session: aiohttp.ClientSession, refresh_token: str) -> None:
+    """Revokes a refresh token, and with it the login, so it can't renew the access token any more."""
+    status, body = await _token_post(
+        session,
+        REVOKE_URL,
+        {"token": refresh_token, "token_type_hint": "refresh_token", "client_id": CLIENT_ID},
+        "to revoke the login",
+    )
+    # A token PostNord no longer knows is answered with 200 as well (RFC 7009).
+    if status != 200:
+        raise PostNordError(f"PostNord didn't revoke the login ({_status(status, body)}{_why(body)})")
 
 
 class PostNordLogin:
@@ -105,33 +168,27 @@ class PostNordLogin:
     async def exchange(self, session: aiohttp.ClientSession, pasted: str) -> tuple[str, str]:
         """The access and refresh token for the pasted redirect."""
         code = self.code_from(pasted)
-        try:
-            async with session.post(
-                TOKEN_URL,
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": REDIRECT_URI,
-                    "client_id": CLIENT_ID,
-                    "code_verifier": self._verifier,
-                },
-                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-                timeout=TIMEOUT,
-            ) as response:
-                status = response.status
-                body = await response.json(content_type=None) if status < 500 else None
-        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-            raise PostNordError(f"PostNord couldn't be reached for the login: {err}") from err
-
-        tokens = body if isinstance(body, dict) else {}
+        status, body = await _token_post(
+            session,
+            TOKEN_URL,
+            {
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": REDIRECT_URI,
+                "client_id": CLIENT_ID,
+                "code_verifier": self._verifier,
+            },
+            "for the login",
+        )
+        tokens = body or {}
         access_token, refresh_token = tokens.get("access_token"), tokens.get("refresh_token")
         if isinstance(access_token, str) and access_token and isinstance(refresh_token, str) and refresh_token:
             return access_token, refresh_token
         # An expired or already used code is a 400 invalid_grant. Anything else, such as a busy server, is no reason to
         # tell the user their code was wrong.
-        if tokens.get("error") in REFUSED_GRANTS:
-            raise PostNordAuthError(f"PostNord didn't accept the login code ({tokens.get('error')})")
-        raise PostNordError(f"PostNord couldn't complete the login (status {status})")
+        if refused := _refused(status, body):
+            raise PostNordAuthError(f"PostNord didn't accept the login code ({refused}{_why(body)})")
+        raise PostNordError(f"PostNord couldn't complete the login ({_status(status, body)}{_why(body)})")
 
 
 class PostNordClient:
@@ -158,14 +215,15 @@ class PostNordClient:
     def refresh_token(self) -> str:
         return self._refresh_token
 
-    async def email(self) -> str:
-        """The email address of the logged-in account, from OpenID userinfo."""
+    async def account(self) -> tuple[str, str | None]:
+        """The email address of the logged-in account and its subject, from OpenID userinfo."""
         info = await self._get(USERINFO_URL, {}, gateway=False)
         info = info if isinstance(info, dict) else {}
         found = info.get("email") or info.get("preferred_username")
         if not isinstance(found, str) or not found.strip():
             raise PostNordError("PostNord didn't tell the account's email address")
-        return found.strip()
+        subject = info.get("sub")
+        return found.strip(), str(subject) if subject else None
 
     async def tracking(self) -> dict[str, Any]:
         """The account's parcels: activeShipments, archivedShipments, deletedShipments.
@@ -174,8 +232,8 @@ class PostNordClient:
         events or dates, so the full parcels are asked for.
         """
         data = await self._get(API_BASE_URL + PATH_TRACKING, {"summary": "false"})
-        if not isinstance(data, dict):
-            raise PostNordError("PostNord sent the tracking data in an unexpected format")
+        if not isinstance(data, dict) or not all(isinstance(data.get(key), list) for key in SHIPMENT_LISTS):
+            raise PostNordError(f"PostNord sent the tracking data without its parcel lists{_why(data)}")
         return data
 
     async def _get(self, url: str, params: dict[str, str], *, gateway: bool = True) -> Any:
@@ -213,35 +271,28 @@ class PostNordClient:
             ) as response:
                 if response.status != 200:
                     return response.status, None
-                return response.status, await response.json(content_type=None)
+                text = await response.text()
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             raise PostNordError(f"PostNord couldn't be reached: {err}") from err
+        try:
+            return 200, json.loads(text)
+        except ValueError as err:
+            raise PostNordError("PostNord answered with something other than JSON") from err
 
     async def _refresh_access_token(self) -> None:
-        try:
-            async with self._session.post(
-                TOKEN_URL,
-                data={
-                    "grant_type": "refresh_token",
-                    "refresh_token": self._refresh_token,
-                    "client_id": CLIENT_ID,
-                },
-                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-                timeout=TIMEOUT,
-            ) as response:
-                status = response.status
-                body = await response.json(content_type=None) if status < 500 else None
-        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-            raise PostNordError(f"PostNord couldn't be reached for a new access token: {err}") from err
-
-        access_token = body.get("access_token") if isinstance(body, dict) else None
+        status, body = await _token_post(
+            self._session,
+            TOKEN_URL,
+            {"grant_type": "refresh_token", "refresh_token": self._refresh_token, "client_id": CLIENT_ID},
+            "for a new access token",
+        )
+        access_token = (body or {}).get("access_token")
         if not isinstance(access_token, str) or not access_token:
             # Only these say the refresh token is gone. A server error, a 429 or a firewall says nothing about it, and
             # the next update tries again.
-            error = body.get("error") if isinstance(body, dict) else None
-            if error in REFUSED_GRANTS:
-                raise PostNordAuthError(f"PostNord no longer accepts the refresh token ({error})")
-            raise PostNordError(f"PostNord couldn't refresh the access token (status {status})")
+            if refused := _refused(status, body):
+                raise PostNordAuthError(f"PostNord no longer accepts the refresh token ({refused})")
+            raise PostNordError(f"PostNord couldn't refresh the access token ({_status(status, body)}{_why(body)})")
 
         self._access_token = access_token
         # A rotated refresh token has to replace the old one, or the next refresh fails.

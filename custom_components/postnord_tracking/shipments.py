@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import quote
 
@@ -90,8 +90,8 @@ class Packages:
     packages: list[dict[str, Any]]
     # Every package within the age limits, however many: the counts.
     current: list[dict[str, Any]]
-    # Every package of the account: what happens to them, also outside the list.
-    every: list[dict[str, Any]]
+    # Every package of the account by its number: what happens to them, also outside the list.
+    every: dict[str, dict[str, Any]]
 
 
 def map_status(raw_status: Any) -> int:
@@ -124,13 +124,14 @@ def build_packages(tracking: Mapping[str, Any], settings: PackageSettings, now: 
 
         keep_newest(newest, changed, package(shipment, changed, settings))
 
-    every = [item for _, item in newest.values()]
+    every = {number: item for number, (_, item) in newest.items()}
     for changed, item in newest.values():
         status = item["status"]
-        age_days = (now - changed).days
-        if status not in COMPLETED_STATUSES and age_days <= settings.stale_shipment_day_limit:
+        # The limits are whole days of age, so a package two days and an hour old is past a limit of two.
+        age = now - changed
+        if status not in COMPLETED_STATUSES and age <= timedelta(days=settings.stale_shipment_day_limit):
             undelivered.append((changed, item))
-        elif status in COMPLETED_STATUSES and age_days <= settings.completed_shipment_days_shown:
+        elif status in COMPLETED_STATUSES and age <= timedelta(days=settings.completed_shipment_days_shown):
             completed.append((changed, item))
 
     undelivered.sort(key=change_time, reverse=True)
@@ -156,11 +157,15 @@ def change_time(item: tuple[datetime, dict[str, Any]]) -> datetime:
     return item[0]
 
 
-def first_item(shipment: Mapping[str, Any]) -> Mapping[str, Any]:
+def items_of(shipment: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """The items of a shipment, leaving out anything in the list that isn't one."""
     items = shipment.get("items")
-    if isinstance(items, list) and items and isinstance(items[0], Mapping):
-        return items[0]
-    return {}
+    return [item for item in items if isinstance(item, Mapping)] if isinstance(items, list) else []
+
+
+def first_item(shipment: Mapping[str, Any]) -> Mapping[str, Any]:
+    items = items_of(shipment)
+    return items[0] if items else {}
 
 
 def latest_event(item: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -230,8 +235,7 @@ def package(shipment: Mapping[str, Any], changed: datetime, settings: PackageSet
 
 
 def item_count(shipment: Mapping[str, Any]) -> int | None:
-    items = shipment.get("items")
-    return len(items) if isinstance(items, list) and items else None
+    return len(items_of(shipment)) or None
 
 
 def address_of(party: Any) -> Mapping[str, Any]:
@@ -260,13 +264,15 @@ def pickup_point(point: Mapping[str, Any], consignee: Mapping[str, Any]) -> dict
     """Where the package is picked up. Only active parcels carry a destinationDeliveryPoint;
     the field names are tentative until one is captured, so read defensively."""
     address = point.get("address") if isinstance(point.get("address"), Mapping) else point
+    # The card shows opening hours as a line of text. Their shape hasn't been seen yet, so anything else is left out.
+    hours = point.get("openingHours")
     found = {
         "name": point.get("name"),
         "street": address.get("street") or address.get("streetName"),
         "postal_code": address.get("postCode") or address.get("postalCode"),
         "city": address.get("city") or consignee.get("city"),
         "type": point.get("type"),
-        "available": point.get("openingHours") or None,
+        "available": hours if isinstance(hours, str) and hours else None,
     }
     # Without a name it is no pickup point, only the receiver's city: a home delivery has nothing else.
     return found if found["name"] else None

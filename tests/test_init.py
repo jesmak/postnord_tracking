@@ -14,7 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.postnord_tracking import async_migrate_entry
-from custom_components.postnord_tracking.const import DOMAIN
+from custom_components.postnord_tracking.const import CLIENT_ID, DOMAIN, REVOKE_URL
 
 from .conftest import ENTRY_DATA, NEW_ACCESS_TOKEN, NOW, TOKEN, TOKEN_URL, TRACKING_URL, USERNAME, answers, tracking
 
@@ -111,3 +111,27 @@ async def test_an_entry_of_a_newer_version_is_refused(hass: HomeAssistant) -> No
     entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=2, minor_version=1, unique_id=USERNAME, data=ENTRY_DATA)
     entry.add_to_hass(hass)
     assert not await async_migrate_entry(hass, entry)
+
+
+async def test_removing_an_account_revokes_its_login(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    aioclient_mock.post(REVOKE_URL, text="")
+    entry = account(hass)
+
+    await hass.config_entries.async_remove(entry.entry_id)
+
+    [(_method, _url, posted, _headers)] = aioclient_mock.mock_calls
+    assert posted == {"token": ENTRY_DATA["refresh_token"], "token_type_hint": "refresh_token", "client_id": CLIENT_ID}
+
+
+async def test_a_revocation_that_fails_is_warned_of_without_the_email(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, caplog: pytest.LogCaptureFixture
+) -> None:
+    aioclient_mock.post(REVOKE_URL, status=503)
+    entry = account(hass)
+
+    await hass.config_entries.async_remove(entry.entry_id)
+
+    [record] = [record for record in caplog.records if record.name.startswith("custom_components.postnord_tracking")]
+    assert record.levelname == "WARNING"
+    assert entry.entry_id in record.getMessage()
+    assert USERNAME not in record.getMessage()
