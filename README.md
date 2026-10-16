@@ -4,22 +4,22 @@ Home Assistant integration that follows the parcels of a PostNord account.
 
 [![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
 
-<img src="https://raw.githubusercontent.com/jesmak/postnord_tracking/main/docs/images/dashboard-light.png#gh-light-mode-only" width="560" alt="A dashboard with the counts of packages on the way and ready for pickup, and package-tracker-card listing a parcel ready for pickup at a service point, one on its way and one delivered">
-<img src="https://raw.githubusercontent.com/jesmak/postnord_tracking/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="560" alt="A dashboard with the counts of packages on the way and ready for pickup, and package-tracker-card listing a parcel ready for pickup at a service point, one on its way and one delivered">
+<img src="https://raw.githubusercontent.com/jesmak/postnord_tracking/main/docs/images/dashboard-light.png#gh-light-mode-only" width="560" alt="A dashboard with the counts of incoming packages on the way and ready for pickup, and package-tracker-card listing a parcel ready for pickup at a service point, one sent to someone else, one on its way and one delivered, each marked incoming or sent">
+<img src="https://raw.githubusercontent.com/jesmak/postnord_tracking/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="560" alt="A dashboard with the counts of incoming packages on the way and ready for pickup, and package-tracker-card listing a parcel ready for pickup at a service point, one sent to someone else, one on its way and one delivered, each marked incoming or sent">
 
 ## What is it?
 
 A custom component that lists the coming and recently delivered parcels of a [PostNord](https://www.postnord.fi/)
-account. There's no need to add parcels by hand. The list comes from the parcels in your account, and it's updated
-every 10 minutes. PostNord keeps delivered parcels in the account too, so recent deliveries stay listed for as long as
-you choose.
+account, and those sent from it, telling the two apart. There's no need to add parcels by hand. The list comes from the
+parcels in your account, and it's updated every 10 minutes. PostNord keeps delivered parcels in the account too, so
+recent deliveries stay listed for as long as you choose.
 
-It has been made and tested with a Finnish PostNord account. The login and the service are the same PostNord app
-ones in Sweden, Denmark and Norway, so accounts there should work as well, but they haven't been tried.
+It has been made and tested with a Finnish PostNord account. The login and the service are the same PostNord app ones in
+Sweden, Denmark and Norway, so accounts there should work as well, but they haven't been tried.
 
 The sensor lists the packages in the format [package-tracker-card](https://github.com/jesmak/package-tracker-card)
-reads, so the card can show them together with packages from other tracking integrations. Two more sensors count the
-packages, and an event entity fires when one of them moves along.
+reads, so the card can show them together with packages from other tracking integrations. Four more sensors count the
+packages coming to you and those you have sent, and an event entity fires when one of them moves along.
 
 This is an unofficial integration. See [Data](#data) for what that means.
 
@@ -209,8 +209,8 @@ entity: sensor.postnord_matti_meikalainen_example_com
 The one **Maximum number of packages** became two, one for incoming packages and one for sent ones. Both take the
 number the account had. **Packages on the way** and **Packages ready for pickup** are now **Incoming on the way** and
 **Incoming ready for pickup**, and no longer count packages sent from the account, which have sensors of their own.
-Their entity IDs stay as they were. Events of sent packages still fire, now with `direction`. Add the
-condition in the example above to an automation that should leave them out.
+Their entity IDs stay as they were. Events of sent packages still fire, now with `direction`. Add the condition in the
+example above to an automation that should leave them out.
 
 The account, the sensors, the event entity, their entity IDs and the other settings all carry over.
 
