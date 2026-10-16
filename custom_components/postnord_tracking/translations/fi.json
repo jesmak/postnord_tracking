@@ -17,7 +17,8 @@
         "data": {
           "language": "Kieli",
           "prioritize_undelivered": "Toimittamattomat ensin",
-          "max_shipments": "Pakettien enimmäismäärä",
+          "max_shipments": "Saapuvien pakettien enimmäismäärä",
+          "max_outgoing_shipments": "Lähetettyjen pakettien enimmäismäärä",
           "stale_shipment_day_limit": "Montako päivää toimittamattomat näkyvät",
           "completed_shipment_day_shown": "Montako päivää toimitetut näkyvät",
           "pickup_code": "Noutokoodi"
@@ -25,7 +26,8 @@
         "data_description": {
           "language": "Pakettitapahtumien kuvausten kieli.",
           "prioritize_undelivered": "Kun paketteja on enemmän kuin enimmäismäärä, toimittamattomat listataan ennen toimitettuja.",
-          "max_shipments": "Montako pakettia sensori listaa.",
+          "max_shipments": "Montako saapuvaa pakettia sensori listaa. Aseta arvoksi nolla jättääksesi saapuvat paketit kokonaan pois, myös laskureista ja tapahtumista.",
+          "max_outgoing_shipments": "Montako lähetettyä pakettia sensori listaa. Aseta arvoksi nolla jättääksesi lähetetyt paketit kokonaan pois, myös laskureista ja tapahtumista.",
           "stale_shipment_day_limit": "Lasketaan paketin viimeisimmästä tapahtumasta. Osa paketeista jää ikuisesti toimitukseen.",
           "completed_shipment_day_shown": "Lasketaan toimituksesta.",
           "pickup_code": "Koodi paketin noutamista varten. Oletuksena pois päältä, koska tieto on arkaluontoista."
@@ -55,7 +57,8 @@
         "data": {
           "language": "Kieli",
           "prioritize_undelivered": "Toimittamattomat ensin",
-          "max_shipments": "Pakettien enimmäismäärä",
+          "max_shipments": "Saapuvien pakettien enimmäismäärä",
+          "max_outgoing_shipments": "Lähetettyjen pakettien enimmäismäärä",
           "stale_shipment_day_limit": "Montako päivää toimittamattomat näkyvät",
           "completed_shipment_day_shown": "Montako päivää toimitetut näkyvät",
           "pickup_code": "Noutokoodi"
@@ -63,7 +66,8 @@
         "data_description": {
           "language": "Pakettitapahtumien kuvausten kieli.",
           "prioritize_undelivered": "Kun paketteja on enemmän kuin enimmäismäärä, toimittamattomat listataan ennen toimitettuja.",
-          "max_shipments": "Montako pakettia sensori listaa.",
+          "max_shipments": "Montako saapuvaa pakettia sensori listaa. Aseta arvoksi nolla jättääksesi saapuvat paketit kokonaan pois, myös laskureista ja tapahtumista.",
+          "max_outgoing_shipments": "Montako lähetettyä pakettia sensori listaa. Aseta arvoksi nolla jättääksesi lähetetyt paketit kokonaan pois, myös laskureista ja tapahtumista.",
           "stale_shipment_day_limit": "Lasketaan paketin viimeisimmästä tapahtumasta. Osa paketeista jää ikuisesti toimitukseen.",
           "completed_shipment_day_shown": "Lasketaan toimituksesta.",
           "pickup_code": "Koodi paketin noutamista varten."
@@ -129,10 +133,16 @@
     },
     "sensor": {
       "on_the_way": {
-        "name": "Paketteja matkalla"
+        "name": "Saapuvat matkalla"
       },
       "ready_for_pickup": {
-        "name": "Paketteja noudettavissa"
+        "name": "Saapuvat noudettavissa"
+      },
+      "outgoing_on_the_way": {
+        "name": "Lähetetyt matkalla"
+      },
+      "outgoing_ready_for_pickup": {
+        "name": "Lähetetyt noudettavissa"
       }
     }
   },

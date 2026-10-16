@@ -22,7 +22,7 @@ ENTITY_ID = "sensor.postnord_matti_meikalainen_example_com"
 
 
 def account(hass: HomeAssistant, **options: object) -> MockConfigEntry:
-    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=2, unique_id=USERNAME, data={**ENTRY_DATA, **options})
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=3, unique_id=USERNAME, data={**ENTRY_DATA, **options})
     entry.add_to_hass(hass)
     return entry
 
@@ -95,16 +95,28 @@ async def test_the_sensor_is_unavailable_while_postnord_is_down(
 
 @pytest.mark.parametrize(("switch", "choice"), [(True, "code"), (False, "none"), (None, "none")])
 async def test_the_pickup_switch_of_an_entry_of_1_1_becomes_a_choice(hass: HomeAssistant, switch: bool | None, choice: str) -> None:
-    data = {key: value for key, value in ENTRY_DATA.items() if key != "pickup_code"}
+    data = {key: value for key, value in ENTRY_DATA.items() if key not in ("pickup_code", "max_outgoing_shipments")} | {"max_shipments": 8}
     if switch is not None:
         data["include_pickup_details"] = switch
     entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=1, unique_id=USERNAME, data=data)
     entry.add_to_hass(hass)
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 2
+    assert entry.minor_version == 3
     assert entry.data["pickup_code"] == choice
     assert "include_pickup_details" not in entry.data
+    assert entry.data["max_outgoing_shipments"] == 8, "and the maximum for sent packages of 1.2, in the same go"
+
+
+async def test_an_entry_of_1_2_gets_its_maximum_for_sent_packages_too(hass: HomeAssistant) -> None:
+    data = {key: value for key, value in ENTRY_DATA.items() if key != "max_outgoing_shipments"} | {"max_shipments": 8}
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=2, unique_id=USERNAME, data=data)
+    entry.add_to_hass(hass)
+    assert await async_migrate_entry(hass, entry)
+
+    assert entry.minor_version == 3
+    assert entry.data["max_shipments"] == 8
+    assert entry.data["max_outgoing_shipments"] == 8
 
 
 async def test_an_entry_of_a_newer_version_is_refused(hass: HomeAssistant) -> None:

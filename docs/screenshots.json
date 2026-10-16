@@ -97,11 +97,11 @@
         },
         "sensor.postnord_matti_meikalainen_example_com_packages_on_the_way": {
             "state": "2",
-            "attributes": { "friendly_name": "Packages on the way", "icon": "mdi:package-variant-closed", "state_class": "measurement" }
+            "attributes": { "friendly_name": "Incoming on the way", "icon": "mdi:package-variant-closed", "state_class": "measurement" }
         },
         "sensor.postnord_matti_meikalainen_example_com_packages_ready_for_pickup": {
             "state": "1",
-            "attributes": { "friendly_name": "Packages ready for pickup", "icon": "mdi:package-down", "state_class": "measurement" }
+            "attributes": { "friendly_name": "Incoming ready for pickup", "icon": "mdi:package-down", "state_class": "measurement" }
         }
     },
     "shots": [

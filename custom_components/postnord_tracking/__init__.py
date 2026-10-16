@@ -14,7 +14,17 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import PostNordError, revoke
-from .const import CONF_INCLUDE_PICKUP_DETAILS, CONF_PICKUP_CODE, CONF_REFRESH_TOKEN, DOMAIN, PICKUP_CODE_CODE, PICKUP_CODE_NONE
+from .const import (
+    CONF_INCLUDE_PICKUP_DETAILS,
+    CONF_MAX_OUTGOING_SHIPMENTS,
+    CONF_MAX_SHIPMENTS,
+    CONF_PICKUP_CODE,
+    CONF_REFRESH_TOKEN,
+    DEFAULT_MAX_SHIPMENTS,
+    DOMAIN,
+    PICKUP_CODE_CODE,
+    PICKUP_CODE_NONE,
+)
 from .coordinator import PostNordConfigEntry, PostNordCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,11 +57,15 @@ async def async_remove_entry(hass: HomeAssistant, entry: PostNordConfigEntry) ->
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: PostNordConfigEntry) -> bool:
-    """Turns the pickup switch of 1.1 entries into a choice: the pickup point is now always included."""
+    """Turns the pickup switch of 1.1 entries into a choice, and gives 1.2 entries a maximum for sent packages."""
     if entry.version != 1:
         return False
     if entry.minor_version < 2:
         data = {key: value for key, value in entry.data.items() if key != CONF_INCLUDE_PICKUP_DETAILS}
         data[CONF_PICKUP_CODE] = PICKUP_CODE_CODE if entry.data.get(CONF_INCLUDE_PICKUP_DETAILS) else PICKUP_CODE_NONE
         hass.config_entries.async_update_entry(entry, data=data, minor_version=2)
+    if entry.minor_version < 3:
+        # The one maximum was for both directions, so sent packages get the same one the entry had.
+        data = {**entry.data, CONF_MAX_OUTGOING_SHIPMENTS: entry.data.get(CONF_MAX_SHIPMENTS, DEFAULT_MAX_SHIPMENTS)}
+        hass.config_entries.async_update_entry(entry, data=data, minor_version=3)
     return True

@@ -7,13 +7,14 @@ from typing import Any
 
 import pytest
 
-from custom_components.postnord_tracking.shipments import Packages, PackageSettings, build_packages, map_status
+from custom_components.postnord_tracking.shipments import Packages, PackageSettings, build_packages, map_direction, map_status
 
 from .conftest import NOW, shipment, tracking
 
 SETTINGS = PackageSettings(
     prioritize_undelivered=True,
     max_shipments=5,
+    max_outgoing_shipments=5,
     stale_shipment_day_limit=15,
     completed_shipment_days_shown=3,
     pickup_code="none",
@@ -74,6 +75,7 @@ def test_package_attributes() -> None:
         "shipment_date": "2026-09-14T06:00:00+00:00",
         "status": 5,
         "raw_status": "AVAILABLE_FOR_DELIVERY",
+        "direction": "incoming",
         "latest_event": "Lähetys on noudettavissa",
         "latest_event_city": "Tampere",
         "latest_event_country": "FI",
@@ -223,3 +225,62 @@ def test_opening_hours_are_passed_on_only_as_text(hours: Any, available: str | N
     parcel["destinationDeliveryPoint"]["openingHours"] = hours
     [package] = build_packages(tracking(active=[parcel], archived=[]), SETTINGS, NOW).packages
     assert package["pickup_point"]["available"] == available
+
+
+def sent(shipment_id: str, status: str, event_time: str, **rest: Any) -> dict[str, Any]:
+    """A parcel the account has sent."""
+    parcel = shipment(shipment_id, status, event_time, **rest)
+    parcel["userData"] = {**parcel["userData"], "direction": "OUTGOING"}
+    return parcel
+
+
+@pytest.mark.parametrize(
+    ("raw", "direction"), [("INCOMING", "incoming"), ("OUTGOING", "outgoing"), ("outgoing", "outgoing"), ("RETURN", None), (None, None)]
+)
+def test_the_direction_of_a_package(raw: Any, direction: str | None) -> None:
+    assert map_direction(raw) == direction
+
+
+def test_each_direction_is_listed_up_to_its_own_maximum() -> None:
+    incoming = [shipment(f"PN100{n}", "EN_ROUTE", f"2026-09-16T0{n}:00:00Z") for n in range(1, 4)]
+    outgoing = [sent(f"PN200{n}", "EN_ROUTE", f"2026-09-16T0{n}:30:00Z") for n in range(1, 4)]
+    settings = replace(SETTINGS, max_shipments=2, max_outgoing_shipments=1)
+    packages = build_packages(tracking(active=[*incoming, *outgoing], archived=[]), settings, NOW)
+    assert numbers(packages) == ["PN2003", "PN1003", "PN1002"], "newest first, two incoming and one sent"
+    assert len(packages.current) == 6, "the counts see all of them"
+
+
+def test_sent_packages_do_not_push_incoming_ones_off_the_list() -> None:
+    outgoing = [sent(f"PN300{n}", "EN_ROUTE", f"2026-09-16T0{n}:00:00Z") for n in range(2, 8)]
+    waited_for = shipment("PN3100", "AVAILABLE_FOR_DELIVERY", "2026-09-15T10:00:00Z")
+    packages = build_packages(tracking(active=[*outgoing, waited_for], archived=[]), SETTINGS, NOW)
+    assert "PN3100" in numbers(packages)
+    assert len(packages.packages) == 6, "five sent and the incoming one"
+
+
+def test_a_maximum_of_0_leaves_that_direction_out_altogether() -> None:
+    incoming = shipment("PN4001", "EN_ROUTE", "2026-09-16T05:00:00Z")
+    outgoing = sent("PN4002", "EN_ROUTE", "2026-09-16T08:00:00Z")
+    packages = build_packages(tracking(active=[incoming, outgoing], archived=[]), replace(SETTINGS, max_outgoing_shipments=0), NOW)
+    assert numbers(packages) == ["PN4001"]
+    assert [package["shipment_number"] for package in packages.current] == ["PN4001"]
+    assert list(packages.every) == ["PN4001"], "no events for it either"
+    assert packages.latest_change.isoformat() == "2026-09-16T05:00:00+00:00", "nor does it change the sensor's time"
+
+
+def test_a_package_whose_direction_is_not_known_goes_with_the_incoming_ones() -> None:
+    unknown = shipment("PN5001", "EN_ROUTE", "2026-09-16T05:00:00Z")
+    unknown["userData"] = {"dateAdded": "2026-09-14T06:00:00Z"}
+    packages = build_packages(tracking(active=[unknown], archived=[]), replace(SETTINGS, max_outgoing_shipments=0), NOW)
+    [package] = packages.packages
+    assert package["direction"] is None
+    assert build_packages(tracking(active=[unknown], archived=[]), replace(SETTINGS, max_shipments=0), NOW).packages == []
+
+
+def test_each_direction_takes_its_undelivered_packages_first() -> None:
+    waiting = shipment("PN6001", "EN_ROUTE", "2026-09-15T05:00:00Z")
+    delivered = shipment("PN6002", "DELIVERED", "2026-09-16T08:00:00Z")
+    outgoing = sent("PN6003", "DELIVERED", "2026-09-16T07:00:00Z")
+    settings = replace(SETTINGS, max_shipments=1, max_outgoing_shipments=1)
+    packages = build_packages(tracking(active=[waiting], archived=[delivered, outgoing]), settings, NOW)
+    assert numbers(packages) == ["PN6001", "PN6003"], "the undelivered incoming one, though older, and the sent one"

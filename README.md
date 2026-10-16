@@ -70,7 +70,8 @@ account's menu on the integration page.
 | ------------------------------------------ | ------- | -------------------------------------------------------------------------------- | ------------------------- |
 | Language                                   | enum    | Language of the package event descriptions, `fi`, `sv`, `nb`, `da` or `en`       | Home Assistant's language |
 | Undelivered packages first                 | boolean | When there are more packages than the maximum, undelivered ones are listed first | on                        |
-| Maximum number of packages                 | number  | How many packages the sensor lists                                               | 5                         |
+| Maximum number of incoming packages        | number  | How many incoming packages the sensor lists. 0 leaves them out altogether        | 5                         |
+| Maximum number of sent packages            | number  | How many sent packages the sensor lists. 0 leaves them out altogether            | 5                         |
 | Days until undelivered packages are hidden | days    | Counted from the latest event. Some packages stay in delivery for good           | 15                        |
 | Days until delivered packages are hidden   | days    | Counted from the delivery. Returned packages count as delivered                  | 3                         |
 | Pickup code                                | enum    | Don't add, or add                                                                | don't add                 |
@@ -93,6 +94,7 @@ The `packages` attribute lists the parcels, and each package has these keys.
 | `shipment_number`                           | PostNord's shipment id, which is the tracking number                                |
 | `status`                                    | The package's status, below                                                         |
 | `raw_status`                                | PostNord's status, such as `AVAILABLE_FOR_DELIVERY`                                 |
+| `direction`                                 | `incoming`, or `outgoing` when sent from the account. Empty if not known            |
 | `origin`, `origin_city`                     | The sender and its city                                                             |
 | `destination`, `destination_city`           | The pickup point when PostNord names one, and the receiver's city                   |
 | `shipment_date`                             | When the parcel turned up in the account                                            |
@@ -125,20 +127,25 @@ only the state. The sensor is unavailable while PostNord can't be reached.
 
 ### Counts
 
-Two sensors count the packages, so a badge or an automation needs no templating. They count every package of the
-account within the days set above, also those the list has no room for.
+Four sensors count the packages, so a badge or an automation needs no templating. They count every package of the
+account within the days set above, also those the list has no room for. A package whose direction PostNord doesn't
+give counts as incoming.
 
-| Sensor                    | What it counts                              |
-| ------------------------- | ------------------------------------------- |
-| Packages on the way       | Everything that hasn't finished its journey |
-| Packages ready for pickup | The ones waiting at a pickup point          |
+| Sensor                    | What it counts                                                     |
+| ------------------------- | ------------------------------------------------------------------ |
+| Incoming on the way       | Incoming packages that haven't finished their journey              |
+| Incoming ready for pickup | Incoming packages waiting at a pickup point                        |
+| Sent on the way           | Packages sent from the account that haven't finished their journey |
+| Sent ready for pickup     | Sent packages waiting for the recipient at a pickup point          |
 
 ## Events
 
 An event entity, **Package**, fires once for everything that happens to a package, so an automation can act on it
 without watching the packages attribute. Several packages changing in one update fire one event each, packages the
 list has no room for included. A new package that is already ready for pickup, delivered or returned when it is first
-seen fires `new_package` and then that status's event, so an automation listening for either hears of it.
+seen fires `new_package` and then that status's event, so an automation listening for either hears of it. Packages
+sent from the account fire events too, with `direction` set to `outgoing`, so an automation about your own parcels
+leaves them out with a condition, as in the example below.
 
 | Event type         | When it fires                                 |
 | ------------------ | --------------------------------------------- |
@@ -148,7 +155,7 @@ seen fires `new_package` and then that status's event, so an automation listenin
 | `delivered`        | It has been delivered                         |
 | `returned`         | It was returned to the sender                 |
 
-The event carries the package it happened to, with `shipment_number`, `status`, `raw_status`, `origin`,
+The event carries the package it happened to, with `shipment_number`, `status`, `raw_status`, `direction`, `origin`,
 `destination`, `destination_city`, `latest_event`, `latest_event_city`, `latest_event_date` and `source`.
 
 Nothing fires for the packages that are already there when Home Assistant starts, or when the integration is reloaded,
@@ -157,8 +164,9 @@ one of PostNord's answers and back in the next is compared with how it was, not 
 
 ## Examples
 
-A notification for every package that can be picked up. The trigger watches every event, not only a change of its
-type, so the second package ready in a row isn't missed. `queued` keeps the events of one update from being dropped.
+A notification for every package that can be picked up, leaving out the ones sent from the account. The trigger
+watches every event, not only a change of its type, so the second package ready in a row isn't missed. `queued` keeps
+the events of one update from being dropped.
 
 ```yaml
 automation:
@@ -175,6 +183,12 @@ automation:
         entity_id: event.postnord_matti_meikalainen_example_com_package
         attribute: event_type
         state: ready_for_pickup
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: event.postnord_matti_meikalainen_example_com_package
+            attribute: direction
+            state: outgoing
     actions:
       - action: notify.mobile_app_phone
         data:
@@ -188,6 +202,16 @@ type: custom:package-tracker-card
 title: Packages
 entity: sensor.postnord_matti_meikalainen_example_com
 ```
+
+## Upgrading from 1.1
+
+The one **Maximum number of packages** became two, one for incoming packages and one for sent ones. Both take the
+number the account had. **Packages on the way** and **Packages ready for pickup** are now **Incoming on the way** and
+**Incoming ready for pickup**, and no longer count packages sent from the account, which have sensors of their own.
+Their entity IDs stay as they were. Events of sent packages still fire, now with `direction`. Add the
+condition in the example above to an automation that should leave them out.
+
+The account, the sensors, the event entity, their entity IDs and the other settings all carry over.
 
 ## Upgrading from 1.0
 

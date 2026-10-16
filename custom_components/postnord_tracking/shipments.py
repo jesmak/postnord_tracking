@@ -17,11 +17,13 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_COMPLETED_SHIPMENT_DAYS_SHOWN,
+    CONF_MAX_OUTGOING_SHIPMENTS,
     CONF_MAX_SHIPMENTS,
     CONF_PICKUP_CODE,
     CONF_PRIORITIZE_UNDELIVERED,
     CONF_STALE_SHIPMENT_DAY_LIMIT,
     DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN,
+    DEFAULT_MAX_OUTGOING_SHIPMENTS,
     DEFAULT_MAX_SHIPMENTS,
     DEFAULT_PICKUP_CODE,
     DEFAULT_PRIORITIZE_UNDELIVERED,
@@ -56,6 +58,12 @@ STATUS_MAP = {
     "OTHER": STATUS_UNKNOWN,
 }
 
+# Which way a package goes, as package-tracker-card reads it. None is not known, and is taken as incoming.
+DIRECTION_INCOMING = "incoming"
+DIRECTION_OUTGOING = "outgoing"
+# PostNord's userData.direction, seen live in capitals (INCOMING). Compared without case.
+DIRECTION_MAP = {"INCOMING": DIRECTION_INCOMING, "OUTGOING": DIRECTION_OUTGOING}
+
 # The statuses a package is done at, for the recency buckets and the counts.
 COMPLETED_STATUSES = (STATUS_DELIVERED, STATUS_RETURNED)
 
@@ -63,7 +71,9 @@ COMPLETED_STATUSES = (STATUS_DELIVERED, STATUS_RETURNED)
 @dataclass(frozen=True)
 class PackageSettings:
     prioritize_undelivered: bool
+    # The most incoming and sent packages listed. 0 leaves that direction out of the list, the counts and the events.
     max_shipments: int
+    max_outgoing_shipments: int
     # Undelivered packages whose latest event is older are hidden: some stay in delivery for good.
     stale_shipment_day_limit: int
     completed_shipment_days_shown: int
@@ -76,6 +86,7 @@ class PackageSettings:
         return cls(
             prioritize_undelivered=bool(data.get(CONF_PRIORITIZE_UNDELIVERED, DEFAULT_PRIORITIZE_UNDELIVERED)),
             max_shipments=int(data.get(CONF_MAX_SHIPMENTS, DEFAULT_MAX_SHIPMENTS)),
+            max_outgoing_shipments=int(data.get(CONF_MAX_OUTGOING_SHIPMENTS, DEFAULT_MAX_OUTGOING_SHIPMENTS)),
             stale_shipment_day_limit=int(data.get(CONF_STALE_SHIPMENT_DAY_LIMIT, DEFAULT_STALE_SHIPMENT_DAY_LIMIT)),
             completed_shipment_days_shown=int(data.get(CONF_COMPLETED_SHIPMENT_DAYS_SHOWN, DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN)),
             pickup_code=str(data.get(CONF_PICKUP_CODE, DEFAULT_PICKUP_CODE)),
@@ -86,7 +97,7 @@ class PackageSettings:
 class Packages:
     # When a shipment of the account last changed, hidden ones included. None when there are none.
     latest_change: datetime | None
-    # The packages to list, newest first and at most the maximum.
+    # The packages to list, newest first and at most the maximum of each direction.
     packages: list[dict[str, Any]]
     # Every package within the age limits, however many: the counts.
     current: list[dict[str, Any]]
@@ -96,6 +107,15 @@ class Packages:
 
 def map_status(raw_status: Any) -> int:
     return STATUS_MAP.get(str(raw_status or "").upper(), STATUS_UNKNOWN)
+
+
+def map_direction(raw_direction: Any) -> str | None:
+    return DIRECTION_MAP.get(str(raw_direction or "").upper())
+
+
+def limit_of(item: Mapping[str, Any], settings: PackageSettings) -> int:
+    """The most packages of the item's direction listed. One whose direction isn't known goes with the incoming ones."""
+    return settings.max_outgoing_shipments if item.get("direction") == DIRECTION_OUTGOING else settings.max_shipments
 
 
 def build_packages(tracking: Mapping[str, Any], settings: PackageSettings, now: datetime) -> Packages:
@@ -119,10 +139,15 @@ def build_packages(tracking: Mapping[str, Any], settings: PackageSettings, now: 
         changed = status_change_time(shipment)
         if changed is None:
             continue
+        item = package(shipment, changed, settings)
+        # A direction whose maximum is 0 is left out altogether: not listed, counted, reported in events or in the time
+        # of the latest change.
+        if limit_of(item, settings) == 0:
+            continue
         if latest_change is None or changed > latest_change:
             latest_change = changed
 
-        keep_newest(newest, changed, package(shipment, changed, settings))
+        keep_newest(newest, changed, item)
 
     every = {number: item for number, (_, item) in newest.items()}
     for changed, item in newest.values():
@@ -140,7 +165,15 @@ def build_packages(tracking: Mapping[str, Any], settings: PackageSettings, now: 
     if not settings.prioritize_undelivered:
         ordered.sort(key=change_time, reverse=True)
     current = [item for _, item in ordered]
-    return Packages(latest_change, current[: settings.max_shipments], current, every)
+    # Each direction up to its own maximum, so many sent packages don't push the incoming ones off the list.
+    listed: list[dict[str, Any]] = []
+    taken = {False: 0, True: 0}
+    for item in current:
+        sent = item.get("direction") == DIRECTION_OUTGOING
+        if taken[sent] < limit_of(item, settings):
+            taken[sent] += 1
+            listed.append(item)
+    return Packages(latest_change, listed, current, every)
 
 
 def keep_newest(newest: dict[str, tuple[datetime, dict[str, Any]]], changed: datetime, item: dict[str, Any]) -> None:
@@ -213,6 +246,7 @@ def package(shipment: Mapping[str, Any], changed: datetime, settings: PackageSet
         "shipment_number": shipment_number,
         "shipment_date": iso(parse_time(user_data.get("dateAdded"))),
         "status": map_status(raw_status),
+        "direction": map_direction(user_data.get("direction")),
         "raw_status": raw_status,
         "latest_event": event.get("eventDescription") or text_of(item.get("statusText")),
         "latest_event_city": location.get("city") or location.get("locationName"),

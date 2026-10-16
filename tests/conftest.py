@@ -24,6 +24,7 @@ ENTRY_DATA = {
     "language": "fi",
     "prioritize_undelivered": True,
     "max_shipments": 5,
+    "max_outgoing_shipments": 5,
     "stale_shipment_day_limit": 15,
     "completed_shipment_day_shown": 3,
     "pickup_code": "none",

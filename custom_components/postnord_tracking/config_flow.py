@@ -34,6 +34,7 @@ from .const import (
     CONF_ACCESS_TOKEN,
     CONF_COMPLETED_SHIPMENT_DAYS_SHOWN,
     CONF_LANGUAGE,
+    CONF_MAX_OUTGOING_SHIPMENTS,
     CONF_MAX_SHIPMENTS,
     CONF_PICKUP_CODE,
     CONF_PRIORITIZE_UNDELIVERED,
@@ -43,6 +44,7 @@ from .const import (
     CONF_SUBJECT,
     CONF_USERNAME,
     DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN,
+    DEFAULT_MAX_OUTGOING_SHIPMENTS,
     DEFAULT_MAX_SHIPMENTS,
     DEFAULT_PICKUP_CODE,
     DEFAULT_PRIORITIZE_UNDELIVERED,
@@ -55,6 +57,8 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 DAYS_SELECTOR = NumberSelector(NumberSelectorConfig(min=0, max=365, step=1, mode=NumberSelectorMode.BOX))
+# 0 leaves that direction out altogether.
+MAX_SELECTOR = NumberSelector(NumberSelectorConfig(min=0, max=50, step=1, mode=NumberSelectorMode.BOX))
 
 LOGIN_SCHEMA = vol.Schema({vol.Required(CONF_REDIRECT_URL): TextSelector()})
 SETTINGS_SCHEMA = vol.Schema(
@@ -63,7 +67,8 @@ SETTINGS_SCHEMA = vol.Schema(
             SelectSelectorConfig(options=LANGUAGES, translation_key=CONF_LANGUAGE, mode=SelectSelectorMode.DROPDOWN)
         ),
         vol.Required(CONF_PRIORITIZE_UNDELIVERED): BooleanSelector(),
-        vol.Required(CONF_MAX_SHIPMENTS): NumberSelector(NumberSelectorConfig(min=1, max=50, step=1, mode=NumberSelectorMode.BOX)),
+        vol.Required(CONF_MAX_SHIPMENTS): MAX_SELECTOR,
+        vol.Required(CONF_MAX_OUTGOING_SHIPMENTS): MAX_SELECTOR,
         vol.Required(CONF_STALE_SHIPMENT_DAY_LIMIT): DAYS_SELECTOR,
         vol.Required(CONF_COMPLETED_SHIPMENT_DAYS_SHOWN): DAYS_SELECTOR,
         vol.Required(CONF_PICKUP_CODE): SelectSelector(
@@ -76,7 +81,7 @@ SETTINGS_SCHEMA = vol.Schema(
 def clean_settings(user_input: Mapping[str, Any]) -> dict[str, Any]:
     """Submitted settings, normalised for storing."""
     data = dict(user_input)
-    for key in (CONF_MAX_SHIPMENTS, CONF_STALE_SHIPMENT_DAY_LIMIT, CONF_COMPLETED_SHIPMENT_DAYS_SHOWN):
+    for key in (CONF_MAX_SHIPMENTS, CONF_MAX_OUTGOING_SHIPMENTS, CONF_STALE_SHIPMENT_DAY_LIMIT, CONF_COMPLETED_SHIPMENT_DAYS_SHOWN):
         if key in data:
             data[key] = int(data[key])
     return data
@@ -92,9 +97,10 @@ def same_account(entry: ConfigEntry, email: str, subject: str | None) -> bool:
 
 
 class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
-    # 1.1 entries have the old pickup switch. __init__.async_migrate_entry updates them.
+    # 1.1 entries have the old pickup switch, and 1.2 ones one maximum for both directions. __init__.async_migrate_entry
+    # updates them.
     VERSION = 1
-    MINOR_VERSION = 2
+    MINOR_VERSION = 3
 
     def __init__(self) -> None:
         # One login per flow: the link on the form stays the same when the form is shown again,
@@ -168,6 +174,7 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_LANGUAGE: self._language(),
             CONF_PRIORITIZE_UNDELIVERED: DEFAULT_PRIORITIZE_UNDELIVERED,
             CONF_MAX_SHIPMENTS: DEFAULT_MAX_SHIPMENTS,
+            CONF_MAX_OUTGOING_SHIPMENTS: DEFAULT_MAX_OUTGOING_SHIPMENTS,
             CONF_STALE_SHIPMENT_DAY_LIMIT: DEFAULT_STALE_SHIPMENT_DAY_LIMIT,
             CONF_COMPLETED_SHIPMENT_DAYS_SHOWN: DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN,
             CONF_PICKUP_CODE: DEFAULT_PICKUP_CODE,

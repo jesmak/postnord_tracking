@@ -33,6 +33,7 @@ EVENT_KEYS = (
     "shipment_number",
     "status",
     "raw_status",
+    "direction",
     "origin",
     "destination",
     "destination_city",

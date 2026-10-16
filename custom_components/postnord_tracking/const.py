@@ -53,7 +53,9 @@ CONF_SUBJECT: Final = "subject"
 CONF_REDIRECT_URL: Final = "redirect_url"
 CONF_LANGUAGE: Final = "language"
 CONF_PRIORITIZE_UNDELIVERED: Final = "prioritize_undelivered"
+# The most incoming packages listed, and the most sent ones. 0 leaves that direction out altogether.
 CONF_MAX_SHIPMENTS: Final = "max_shipments"
+CONF_MAX_OUTGOING_SHIPMENTS: Final = "max_outgoing_shipments"
 CONF_STALE_SHIPMENT_DAY_LIMIT: Final = "stale_shipment_day_limit"
 CONF_COMPLETED_SHIPMENT_DAYS_SHOWN: Final = "completed_shipment_day_shown"
 # Whether packages carry their pickup code. Before config entry version 1.2 (release 1.1.0) this was
@@ -68,6 +70,7 @@ PICKUP_CODE_OPTIONS: Final = [PICKUP_CODE_NONE, PICKUP_CODE_CODE]
 # The code is left out unless asked for, since it collects the package.
 DEFAULT_PICKUP_CODE: Final = PICKUP_CODE_NONE
 DEFAULT_MAX_SHIPMENTS: Final = 5
+DEFAULT_MAX_OUTGOING_SHIPMENTS: Final = 5
 DEFAULT_STALE_SHIPMENT_DAY_LIMIT: Final = 15
 DEFAULT_COMPLETED_SHIPMENT_DAYS_SHOWN: Final = 3
 

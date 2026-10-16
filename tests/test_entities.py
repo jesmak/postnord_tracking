@@ -17,8 +17,10 @@ from custom_components.postnord_tracking.const import DOMAIN
 from .conftest import ENTRY_DATA, NOW, TOKEN_URL, TRACKING_URL, USERNAME, shipment, tracking
 
 EVENT_ENTITY = "event.postnord_matti_meikalainen_example_com_package"
-ON_THE_WAY = "sensor.postnord_matti_meikalainen_example_com_packages_on_the_way"
-READY = "sensor.postnord_matti_meikalainen_example_com_packages_ready_for_pickup"
+ON_THE_WAY = "sensor.postnord_matti_meikalainen_example_com_incoming_on_the_way"
+READY = "sensor.postnord_matti_meikalainen_example_com_incoming_ready_for_pickup"
+SENT_ON_THE_WAY = "sensor.postnord_matti_meikalainen_example_com_sent_on_the_way"
+SENT_READY = "sensor.postnord_matti_meikalainen_example_com_sent_ready_for_pickup"
 
 
 async def answer(active: list[dict[str, Any]]) -> AiohttpClientMockResponse:
@@ -27,7 +29,7 @@ async def answer(active: list[dict[str, Any]]) -> AiohttpClientMockResponse:
 
 
 def account(hass: HomeAssistant) -> MockConfigEntry:
-    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=2, unique_id=USERNAME, data=ENTRY_DATA)
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=3, unique_id=USERNAME, data=ENTRY_DATA)
     entry.add_to_hass(hass)
     return entry
 
@@ -244,3 +246,45 @@ async def test_a_package_first_seen_at_its_pickup_point_fires_both_events(
     await next_update(hass, freezer)
 
     assert [event for event in seen if event] == ["new_package", "ready_for_pickup"]
+
+
+def sent(shipment_id: str, status: str, event_time: str, **rest: Any) -> dict[str, Any]:
+    parcel = shipment(shipment_id, status, event_time, **rest)
+    parcel["userData"] = {**parcel["userData"], "direction": "OUTGOING"}
+    return parcel
+
+
+async def test_sent_packages_are_counted_apart(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer: FrozenDateTimeFactory
+) -> None:
+    parcels = [
+        shipment("PN0601", "AVAILABLE_FOR_DELIVERY", "2026-09-16T08:30:00Z"),
+        sent("PN0602", "AVAILABLE_FOR_DELIVERY", "2026-09-16T08:40:00Z"),
+        sent("PN0603", "EN_ROUTE", "2026-09-16T08:50:00Z", event="Lähetys on kuljetuksessa"),
+    ]
+    aioclient_mock.post(TOKEN_URL, json={"access_token": "t"})
+    aioclient_mock.get(TRACKING_URL, side_effect=lambda *_: answer(parcels))
+    await set_up(hass, freezer)
+
+    assert hass.states.get(ON_THE_WAY).state == "1"
+    assert hass.states.get(READY).state == "1"
+    assert hass.states.get(SENT_ON_THE_WAY).state == "2"
+    assert hass.states.get(SENT_READY).state == "1"
+    registry = er.async_get(hass)
+    assert registry.async_get(SENT_ON_THE_WAY).unique_id == f"postnord_{USERNAME}_outgoing_on_the_way"
+
+
+async def test_an_event_says_which_way_the_package_goes(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer: FrozenDateTimeFactory
+) -> None:
+    parcels = [sent("PN0701", "EN_ROUTE", "2026-09-16T08:30:00Z", event="Lähetys on kuljetuksessa")]
+    aioclient_mock.post(TOKEN_URL, json={"access_token": "t"})
+    aioclient_mock.get(TRACKING_URL, side_effect=lambda *_: answer(parcels))
+    await set_up(hass, freezer)
+
+    parcels[:] = [sent("PN0701", "AVAILABLE_FOR_DELIVERY", "2026-09-16T11:30:00Z")]
+    await next_update(hass, freezer)
+
+    state = hass.states.get(EVENT_ENTITY)
+    assert state.attributes["event_type"] == "ready_for_pickup"
+    assert state.attributes["direction"] == "outgoing"
