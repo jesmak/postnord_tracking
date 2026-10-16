@@ -95,7 +95,8 @@ The `packages` attribute lists the parcels, and each package has these keys.
 | `status`                                    | The package's status, below                                                         |
 | `raw_status`                                | PostNord's status, such as `AVAILABLE_FOR_DELIVERY`                                 |
 | `direction`                                 | `incoming`, or `outgoing` when sent from the account. Empty if not known            |
-| `origin`, `origin_city`                     | The sender and its city                                                             |
+| `origin`, `origin_city`                     | The sender and its city. Empty for a package you sent                               |
+| `recipient`                                 | Who a package you sent goes to, when PostNord says                                  |
 | `destination`, `destination_city`           | The pickup point when PostNord names one, and the receiver's city                   |
 | `shipment_date`                             | When the parcel turned up in the account                                            |
 | `latest_event`                              | The latest event, in the chosen language                                            |

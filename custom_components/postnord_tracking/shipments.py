@@ -234,19 +234,24 @@ def package(shipment: Mapping[str, Any], changed: datetime, settings: PackageSet
     consignee = address_of(shipment.get("consignee"))
     user_data = shipment.get("userData") if isinstance(shipment.get("userData"), Mapping) else {}
     raw_status = item.get("status") or shipment.get("status")
+    direction = map_direction(user_data.get("direction"))
+    sent = direction == DIRECTION_OUTGOING
     point = shipment.get("destinationDeliveryPoint")
     point = point if isinstance(point, Mapping) else {}
     location = event.get("location") if isinstance(event.get("location"), Mapping) else {}
     shipment_number = shipment.get("shipmentId") or item.get("itemId")
     return {
-        "origin": name_of(shipment.get("consignor")),
-        "origin_city": consignor.get("city"),
+        # The sender of a sent package is the user, so it says nothing. Who it goes to is named instead, which
+        # package-tracker-card shows in the sender's place.
+        "origin": None if sent else name_of(shipment.get("consignor")),
+        "origin_city": None if sent else consignor.get("city"),
+        "recipient": name_of(shipment.get("consignee")) if sent else None,
         "destination": point.get("name") if point else None,
         "destination_city": consignee.get("city"),
         "shipment_number": shipment_number,
         "shipment_date": iso(parse_time(user_data.get("dateAdded"))),
         "status": map_status(raw_status),
-        "direction": map_direction(user_data.get("direction")),
+        "direction": direction,
         "raw_status": raw_status,
         "latest_event": event.get("eventDescription") or text_of(item.get("statusText")),
         "latest_event_city": location.get("city") or location.get("locationName"),

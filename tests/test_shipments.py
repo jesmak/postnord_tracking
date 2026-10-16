@@ -69,6 +69,7 @@ def test_package_attributes() -> None:
     assert ready == {
         "origin": "Example Shop",
         "origin_city": "Stockholm",
+        "recipient": None,
         "destination": None,
         "destination_city": "Tampere",
         "shipment_number": "PN0001",
@@ -284,3 +285,15 @@ def test_each_direction_takes_its_undelivered_packages_first() -> None:
     settings = replace(SETTINGS, max_shipments=1, max_outgoing_shipments=1)
     packages = build_packages(tracking(active=[waiting], archived=[delivered, outgoing]), settings, NOW)
     assert numbers(packages) == ["PN6001", "PN6003"], "the undelivered incoming one, though older, and the sent one"
+
+
+def test_a_sent_package_names_its_recipient_not_its_sender() -> None:
+    parcel = sent("PN7001", "EN_ROUTE", "2026-09-16T05:30:00Z")
+    parcel["consignee"] = {"name": "Maija Mallikas", "address": {"city": "Malmö", "countryCode": "SE"}}
+    [package] = build_packages(tracking(active=[parcel], archived=[]), SETTINGS, NOW).packages
+    assert (package["origin"], package["origin_city"]) == (None, None), "its sender is the user"
+    assert package["recipient"] == "Maija Mallikas"
+    [received] = build_packages(
+        tracking(active=[shipment("PN7002", "EN_ROUTE", "2026-09-16T05:30:00Z")], archived=[]), SETTINGS, NOW
+    ).packages
+    assert received["recipient"] is None

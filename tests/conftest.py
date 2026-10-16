@@ -64,7 +64,7 @@ def shipment(
         "shipmentId": shipment_id,
         "status": status,
         "consignor": {"name": "Example Shop", "address": {"city": "Stockholm", "countryCode": "SE"}},
-        "consignee": {"address": {"city": "Tampere", "postCode": "33100", "countryCode": "FI"}},
+        "consignee": {"name": "Matti Meikäläinen", "address": {"city": "Tampere", "postCode": "33100", "countryCode": "FI"}},
         "userData": {"dateAdded": "2026-09-14T06:00:00Z", "direction": "INCOMING"},
         "items": [item],
     }
