@@ -145,10 +145,18 @@ async def test_server_errors_are_not_token_problems(
     assert not isinstance(error.value, PostNordAuthError)
 
 
-async def test_connection_errors(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
-    aioclient_mock.get(TRACKING_URL, exc=aiohttp.ClientError("connection reset"))
-    with pytest.raises(PostNordError):
+@pytest.mark.parametrize("error", [TimeoutError(), aiohttp.ClientConnectionError("Connection reset")], ids=["timeout", "message"])
+@pytest.mark.parametrize("request_", ["tracking", "refresh"])
+async def test_connection_errors(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, request_: str, error: Exception) -> None:
+    if request_ == "tracking":
+        aioclient_mock.get(TRACKING_URL, exc=error)
+    else:
+        aioclient_mock.get(TRACKING_URL, status=401)
+        aioclient_mock.post(TOKEN_URL, exc=error)
+    with pytest.raises(PostNordError) as raised:
         await client(hass).tracking()
+    purpose = " for a new access token" if request_ == "refresh" else ""
+    assert str(raised.value) == f"PostNord couldn't be reached{purpose}: {str(error) or 'TimeoutError'}", "an empty message is named"
 
 
 async def test_an_unexpected_response(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:

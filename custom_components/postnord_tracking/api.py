@@ -97,7 +97,8 @@ async def _token_post(session: aiohttp.ClientSession, url: str, data: dict[str, 
             status = response.status
             text = await response.text()
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-        raise PostNordError(f"PostNord couldn't be reached {purpose}: {err}") from err
+        # A timeout's message is empty, and the coordinator logs only the first failure, so the type is the cause.
+        raise PostNordError(f"PostNord couldn't be reached {purpose}: {str(err) or type(err).__name__}") from err
     try:
         body = json.loads(text)
     except ValueError:
@@ -273,7 +274,7 @@ class PostNordClient:
                     return response.status, None
                 text = await response.text()
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-            raise PostNordError(f"PostNord couldn't be reached: {err}") from err
+            raise PostNordError(f"PostNord couldn't be reached: {str(err) or type(err).__name__}") from err
         try:
             return 200, json.loads(text)
         except ValueError as err:
