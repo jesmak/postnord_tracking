@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -42,6 +43,8 @@ class PostNordCoordinator(DataUpdateCoordinator[Packages]):
             entry.data[CONF_LANGUAGE],
             self._save_access_token,
         )
+        # When the parcels were last read from PostNord, whether or not anything had changed.
+        self.last_checked: datetime | None = None
 
     @callback
     def _save_access_token(self, access_token: str) -> None:
@@ -77,4 +80,6 @@ class PostNordCoordinator(DataUpdateCoordinator[Packages]):
             raise ConfigEntryAuthFailed(str(err)) from err
         except PostNordError as err:
             raise UpdateFailed(str(err)) from err
-        return build_packages(tracking, self.settings, dt_util.now())
+        packages = build_packages(tracking, self.settings, dt_util.now())
+        self.last_checked = dt_util.utcnow()
+        return packages

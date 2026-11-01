@@ -123,8 +123,10 @@ The `packages` attribute lists the parcels, and each package has these keys.
 
 PostNord has no separate "received" or "in delivery" status, so `2` and `4` aren't used.
 
-A parcel delivered home has no pickup point. Times are ISO 8601 with their zone. The packages aren't stored in the recorder,
-only the state. The sensor is unavailable while PostNord can't be reached.
+The `last_checked` attribute is when the parcels were last read from PostNord, whether or not anything had changed.
+
+A parcel delivered home has no pickup point. Times are ISO 8601 with their zone. Neither attribute is stored in the
+recorder, only the state. The sensor is unavailable while PostNord can't be reached.
 
 ### Counts
 
