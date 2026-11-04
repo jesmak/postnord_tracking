@@ -2,7 +2,7 @@
 
 Home Assistant integration that follows the parcels of a PostNord account.
 
-[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
+[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
 
 <img src="https://raw.githubusercontent.com/jesmak/postnord_tracking/main/docs/images/dashboard-light.png#gh-light-mode-only" width="560" alt="A dashboard with the counts of incoming packages on the way and ready for pickup, and package-tracker-card listing a parcel ready for pickup at a service point, one sent to someone else, one on its way and one delivered, each marked incoming or sent">
 <img src="https://raw.githubusercontent.com/jesmak/postnord_tracking/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="560" alt="A dashboard with the counts of incoming packages on the way and ready for pickup, and package-tracker-card listing a parcel ready for pickup at a service point, one sent to someone else, one on its way and one delivered, each marked incoming or sent">
@@ -25,10 +25,10 @@ This is an unofficial integration. See [Data](#data) for what that means.
 
 ## Installation
 
-### With HACS
+### With the Marketplace
 
-1. Add this repository to HACS custom repositories with type **Integration**
-2. Search for PostNord package tracking in HACS and download it
+1. Open Settings › Marketplace, choose Add from link and paste `https://github.com/jesmak/postnord_tracking`
+2. Open PostNord package tracking in the Marketplace and choose Install
 3. Restart Home Assistant
 4. Add the integration in Settings › Devices & services and log in (see [Logging in](#logging-in))
 
@@ -274,6 +274,6 @@ MIT, see [LICENSE](LICENSE).
 [releases-shield]: https://img.shields.io/github/release/jesmak/postnord_tracking.svg?style=for-the-badge
 [release-date-shield]: https://img.shields.io/github/release-date/jesmak/postnord_tracking?style=for-the-badge
 [releases]: https://github.com/jesmak/postnord_tracking/releases
-[hacs-shield]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
-[hacs]: https://hacs.xyz/docs/faq/custom_repositories/
+[marketplace-shield]: https://img.shields.io/badge/Marketplace-Custom-orange.svg?style=for-the-badge
+[marketplace]: https://my.home-assistant.io/redirect/marketplace_repository/?owner=jesmak&repository=postnord_tracking&category=integration
 [license-shield]: https://img.shields.io/github/license/jesmak/postnord_tracking.svg?style=for-the-badge
