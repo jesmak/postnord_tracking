@@ -1,5 +1,7 @@
 {
   "name": "PostNord package tracking",
   "render_readme": true,
+  "zip_release": true,
+  "filename": "postnord_tracking.zip",
   "homeassistant": "2026.9.3"
 }
