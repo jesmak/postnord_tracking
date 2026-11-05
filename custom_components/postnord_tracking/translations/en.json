@@ -30,7 +30,7 @@
           "max_outgoing_shipments": "How many sent packages the sensor lists. Set it to 0 to leave sent packages out altogether, from the counts and events too.",
           "stale_shipment_day_limit": "Counted from the package's latest event. Some packages stay in delivery for good.",
           "completed_shipment_day_shown": "Counted from the delivery.",
-          "pickup_code": "A code for collecting the package. Off by default as this is sensitive data."
+          "pickup_code": "A code for collecting the package. Off by default as this is sensitive data. PostNord doesn't give the code to the integration yet, so it stays empty for now."
         }
       },
       "reauth_confirm": {
@@ -70,7 +70,7 @@
           "max_outgoing_shipments": "How many sent packages the sensor lists. Set it to 0 to leave sent packages out altogether, from the counts and events too.",
           "stale_shipment_day_limit": "Counted from the package's latest event. Some packages stay in delivery for good.",
           "completed_shipment_day_shown": "Counted from the delivery.",
-          "pickup_code": "A code for collecting the package."
+          "pickup_code": "A code for collecting the package. PostNord doesn't give the code to the integration yet, so it stays empty for now."
         }
       },
       "reconfigure_login": {
@@ -89,7 +89,7 @@
       "no_code": "That isn't the login address. Copy the whole address that starts with com.postnord.app://redirect?code=.",
       "wrong_state": "That address is from another login. Use the link on this form.",
       "wrong_account": "That login is for another PostNord account. Log in as {username}.",
-      "cannot_connect": "PostNord couldn't be reached. Try again in a moment."
+      "cannot_connect": "PostNord couldn't be reached. Wait a moment, then log in again with the link and paste the new address."
     },
     "abort": {
       "already_configured": "This PostNord account has already been added.",

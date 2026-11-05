@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import PostNordAuthError, PostNordClient, PostNordError
-from .const import CONF_ACCESS_TOKEN, CONF_LANGUAGE, CONF_REFRESH_TOKEN, CONF_USERNAME, DOMAIN, UPDATE_INTERVAL
+from .const import CONF_ACCESS_TOKEN, CONF_LANGUAGE, CONF_REFRESH_TOKEN, CONF_SUBJECT, CONF_USERNAME, DOMAIN, UPDATE_INTERVAL
 from .shipments import Packages, PackageSettings, build_packages
 
 _LOGGER = logging.getLogger(__name__)
@@ -80,6 +80,19 @@ class PostNordCoordinator(DataUpdateCoordinator[Packages]):
             raise ConfigEntryAuthFailed(str(err)) from err
         except PostNordError as err:
             raise UpdateFailed(str(err)) from err
+        if CONF_SUBJECT not in self.config_entry.data:
+            await self._save_subject()
         packages = build_packages(tracking, self.settings, dt_util.now())
         self.last_checked = dt_util.utcnow()
         return packages
+
+    async def _save_subject(self) -> None:
+        """Gives an entry from before the account's subject was saved its subject, so that logging in again recognises
+        the account by it and a changed email can be given. A failure leaves it for the next update."""
+        try:
+            _, subject = await self.client.account()
+        except PostNordError as err:
+            _LOGGER.debug("The account's subject couldn't be read: %s", err)
+            return
+        if subject:
+            self.hass.config_entries.async_update_entry(self.config_entry, data={**self.config_entry.data, CONF_SUBJECT: subject})

@@ -239,6 +239,7 @@ class PostNordClient:
 
     async def _get(self, url: str, params: dict[str, str], *, gateway: bool = True) -> Any:
         status, body = await self._fetch(url, params, gateway)
+        # Which of the two an expired access token gets hasn't been seen, so either is refreshed once.
         if status in (401, 403):
             await self._refresh_access_token()
             status, body = await self._fetch(url, params, gateway)

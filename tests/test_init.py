@@ -14,15 +14,23 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.postnord_tracking import async_migrate_entry
-from custom_components.postnord_tracking.const import CLIENT_ID, DOMAIN, REVOKE_URL
+from custom_components.postnord_tracking.const import CLIENT_ID, DOMAIN, REVOKE_URL, USERINFO_URL
 
-from .conftest import ENTRY_DATA, NEW_ACCESS_TOKEN, NOW, TOKEN, TOKEN_URL, TRACKING_URL, USERNAME, answers, tracking
+from .conftest import ENTRY_DATA, NEW_ACCESS_TOKEN, NOW, TOKEN, TOKEN_URL, TRACKING_URL, USERINFO, USERNAME, answers, tracking
 
 ENTITY_ID = "sensor.postnord_matti_meikalainen_example_com"
 
 
 def account(hass: HomeAssistant, **options: object) -> MockConfigEntry:
     entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=3, unique_id=USERNAME, data={**ENTRY_DATA, **options})
+    entry.add_to_hass(hass)
+    return entry
+
+
+def without_subject(hass: HomeAssistant) -> MockConfigEntry:
+    """An entry from before the account's subject was saved."""
+    data = {key: value for key, value in ENTRY_DATA.items() if key != "subject"}
+    entry = MockConfigEntry(domain=DOMAIN, title=USERNAME, version=1, minor_version=3, unique_id=USERNAME, data=data)
     entry.add_to_hass(hass)
     return entry
 
@@ -44,9 +52,29 @@ async def test_the_sensor_lists_the_packages(hass: HomeAssistant, postnord: Aioh
         "PN0003",
     ]
     assert er.async_get(hass).async_get(ENTITY_ID).unique_id == f"postnord_{USERNAME}"
+    assert USERNAME not in entry.runtime_data.name, "update errors in the log don't name the account"
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert entry.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_an_entry_without_the_account_s_subject_gets_it_once(hass: HomeAssistant, postnord: AiohttpClientMocker) -> None:
+    postnord.get(USERINFO_URL, json=USERINFO)
+    entry = without_subject(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.data["subject"] == USERINFO["sub"]
+
+
+async def test_a_subject_that_can_not_be_read_waits_for_the_next_update(hass: HomeAssistant, postnord: AiohttpClientMocker) -> None:
+    postnord.get(USERINFO_URL, status=500)
+    entry = without_subject(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert "subject" not in entry.data
 
 
 async def test_a_refreshed_access_token_is_saved(

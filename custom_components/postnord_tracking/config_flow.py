@@ -17,6 +17,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
@@ -29,7 +30,7 @@ from homeassistant.helpers.selector import (
     TextSelector,
 )
 
-from .api import PostNordAuthError, PostNordClient, PostNordError, PostNordLogin, PostNordRedirectError
+from .api import PostNordAuthError, PostNordClient, PostNordError, PostNordLogin, PostNordRedirectError, revoke
 from .const import (
     CONF_ACCESS_TOKEN,
     CONF_COMPLETED_SHIPMENT_DAYS_SHOWN,
@@ -115,6 +116,7 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns the errors; on success, the account's email, subject and tokens are in self._account.
         """
         session = async_get_clientsession(self.hass)
+        client: PostNordClient | None = None
         try:
             access_token, refresh_token = await self._login.exchange(session, pasted)
             client = PostNordClient(session, access_token, refresh_token, language)
@@ -122,12 +124,14 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
             await client.tracking()
         except PostNordRedirectError as err:
             return {CONF_REDIRECT_URL: err.reason}
-        except PostNordAuthError as err:
-            _LOGGER.warning("PostNord didn't accept the login: %s", err)
-            return {"base": "invalid_auth"}
         except PostNordError as err:
-            _LOGGER.warning("Logging in to PostNord failed: %s", err)
-            return {"base": "cannot_connect"}
+            if isinstance(err, PostNordAuthError):
+                _LOGGER.warning("PostNord didn't accept the login: %s", err)
+            else:
+                _LOGGER.warning("Logging in to PostNord failed: %s", err)
+            if client is not None:
+                await self._end_login(client.refresh_token)
+            return {"base": "invalid_auth" if isinstance(err, PostNordAuthError) else "cannot_connect"}
         self._account = {
             CONF_USERNAME: email,
             CONF_ACCESS_TOKEN: client.access_token,
@@ -136,6 +140,13 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
         if subject:
             self._account[CONF_SUBJECT] = subject
         return {}
+
+    async def _end_login(self, refresh_token: str) -> None:
+        """Ends a login the flow won't keep, so its refresh token isn't left working at PostNord with nobody holding it."""
+        try:
+            await revoke(async_get_clientsession(self.hass), refresh_token)
+        except PostNordError as err:
+            _LOGGER.warning("A login that wasn't kept couldn't be ended at PostNord: %s", err)
 
     def _new_login(self) -> dict[str, str]:
         """The new tokens and the subject alone: an entry keeps its username, which its entities' ids are built from."""
@@ -160,7 +171,11 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
             errors = await self._log_in(user_input[CONF_REDIRECT_URL], self._language())
             if not errors:
                 await self.async_set_unique_id(self._account[CONF_USERNAME].lower())
-                self._abort_if_unique_id_configured()
+                try:
+                    self._abort_if_unique_id_configured()
+                except AbortFlow:
+                    await self._end_login(self._account[CONF_REFRESH_TOKEN])
+                    raise
                 return await self.async_step_settings()
         return self._show_login("user", errors)
 
@@ -189,6 +204,7 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
         """Logging in again to the account of an entry. Returns the errors."""
         errors = await self._log_in(user_input[CONF_REDIRECT_URL], entry.data[CONF_LANGUAGE])
         if not errors and not same_account(entry, self._account[CONF_USERNAME], self._account.get(CONF_SUBJECT)):
+            await self._end_login(self._account[CONF_REFRESH_TOKEN])
             errors = {"base": "wrong_account"}
         return errors
 

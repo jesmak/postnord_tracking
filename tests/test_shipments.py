@@ -57,13 +57,6 @@ def test_newest_first_when_undelivered_packages_are_not_prioritised() -> None:
     assert numbers(build_packages(tracking(), settings, NOW)) == ["PN0002", "PN0006", "PN0001"]
 
 
-def test_active_and_archived_parcels_are_both_listed() -> None:
-    # PN0002 is active (in transport), PN0003 archived (delivered): both come through.
-    numbers_shown = numbers(build_packages(tracking(), SETTINGS, NOW))
-    assert "PN0002" in numbers_shown
-    assert "PN0003" in numbers_shown
-
-
 def test_package_attributes() -> None:
     _, ready, _delivered_no_events, _ = build_packages(tracking(), SETTINGS, NOW).packages
     assert ready == {
@@ -147,13 +140,6 @@ def test_a_package_carries_what_postnord_knows_of_it() -> None:
     assert package["package_count"] == 2
 
 
-def test_the_pickup_point_is_always_there_but_the_code_only_when_asked_for() -> None:
-    [package] = build_packages(tracking(active=[with_details()], archived=[]), SETTINGS, NOW).packages
-    assert package["pickup_point"]["name"] == "PostNord Service Point"
-    assert package["pickup_code"] is None
-    assert package["pickup_qr"] is None
-
-
 def test_the_pickup_point_and_no_code_even_when_asked_for() -> None:
     """A collectCode on the parcel is the key of the code's lookup, not the code, so it is never shown as one."""
     settings = replace(SETTINGS, pickup_code="code")
@@ -168,6 +154,7 @@ def test_the_pickup_point_and_no_code_even_when_asked_for() -> None:
     }
     assert package["destination"] == "PostNord Service Point"
     assert package["pickup_code"] is None
+    assert package["pickup_qr"] is None
 
 
 def test_the_counts_and_events_see_every_package_not_only_the_listed_ones() -> None:

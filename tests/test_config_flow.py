@@ -14,7 +14,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.postnord_tracking.const import CLIENT_ID, DOMAIN, REDIRECT_URI, USERINFO_URL
+from custom_components.postnord_tracking.const import CLIENT_ID, DOMAIN, REDIRECT_URI, REVOKE_URL, USERINFO_URL
 
 from .conftest import (
     ENTRY_DATA,
@@ -79,6 +79,12 @@ def expect_login(aioclient_mock: AiohttpClientMocker, userinfo: dict | None = No
     aioclient_mock.post(TOKEN_URL, json=LOGIN_TOKENS)
     aioclient_mock.get(USERINFO_URL, json=userinfo or USERINFO)
     aioclient_mock.get(TRACKING_URL, json=tracking())
+    aioclient_mock.post(REVOKE_URL, text="")
+
+
+def revoked(aioclient_mock: AiohttpClientMocker) -> list[str]:
+    """The refresh tokens the flow ended at PostNord."""
+    return [call[2]["token"] for call in aioclient_mock.mock_calls if str(call[1]) == REVOKE_URL]
 
 
 def exchange_form(aioclient_mock: AiohttpClientMocker) -> dict[str, Any]:
@@ -209,22 +215,26 @@ async def test_a_busy_login_is_not_a_wrong_code(hass: HomeAssistant, aioclient_m
 async def test_postnord_cannot_be_reached(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
     aioclient_mock.post(TOKEN_URL, json=LOGIN_TOKENS)
     aioclient_mock.get(USERINFO_URL, status=500)
+    aioclient_mock.post(REVOKE_URL, text="")
     result = await start(hass)
 
     result = await paste(hass, result, redirect(result))
 
     assert result["errors"] == {"base": "cannot_connect"}
+    assert revoked(aioclient_mock) == [NEW_REFRESH_TOKEN], "the login that got its tokens isn't left working"
 
 
 async def test_a_failed_login_is_logged(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, caplog: pytest.LogCaptureFixture) -> None:
     aioclient_mock.post(TOKEN_URL, json=LOGIN_TOKENS)
     aioclient_mock.get(USERINFO_URL, json={"sub": "user-1"})
+    aioclient_mock.post(REVOKE_URL, status=503)
     result = await start(hass)
 
     result = await paste(hass, result, redirect(result))
 
     assert result["errors"] == {"base": "cannot_connect"}
     assert "PostNord didn't tell the account's email address" in caplog.text
+    assert "A login that wasn't kept couldn't be ended at PostNord" in caplog.text, "a failed revocation is only logged"
 
 
 async def test_an_account_is_added_only_once(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
@@ -236,6 +246,7 @@ async def test_an_account_is_added_only_once(hass: HomeAssistant, aioclient_mock
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+    assert revoked(aioclient_mock) == [NEW_REFRESH_TOKEN]
 
 
 async def test_logging_in_again_when_the_login_stops_working(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
@@ -263,6 +274,7 @@ async def test_logging_in_again_as_someone_else(hass: HomeAssistant, aioclient_m
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "wrong_account"}
     assert entry.data["refresh_token"] == "expired"
+    assert revoked(aioclient_mock) == [NEW_REFRESH_TOKEN], "the other account's login isn't left working"
 
 
 async def test_logging_in_again_after_the_email_changed(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:

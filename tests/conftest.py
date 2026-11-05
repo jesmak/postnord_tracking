@@ -21,6 +21,7 @@ ENTRY_DATA = {
     "username": USERNAME,
     "access_token": ACCESS_TOKEN,
     "refresh_token": REFRESH_TOKEN,
+    "subject": "user-1",
     "language": "fi",
     "prioritize_undelivered": True,
     "max_shipments": 5,

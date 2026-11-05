@@ -308,3 +308,23 @@ async def test_an_event_says_which_way_the_package_goes(
     state = hass.states.get(EVENT_ENTITY)
     assert state.attributes["event_type"] == "ready_for_pickup"
     assert state.attributes["direction"] == "outgoing"
+
+
+async def test_packages_the_list_has_no_room_for_are_counted_and_fire_events(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, freezer: FrozenDateTimeFactory
+) -> None:
+    # Seven on their way, and the list has room for five: the two oldest are left out of it.
+    parcels = [shipment(f"PN030{n}", "EN_ROUTE", f"2026-09-16T08:0{n}:00Z", event="Lähetys on kuljetuksessa") for n in range(7)]
+    aioclient_mock.post(TOKEN_URL, json={"access_token": "t"})
+    aioclient_mock.get(TRACKING_URL, side_effect=lambda *_: answer(parcels))
+    await set_up(hass, freezer)
+    assert "PN0300" not in [package["shipment_number"] for package in hass.states.get(PACKAGES).attributes["packages"]]
+    assert hass.states.get(ON_THE_WAY).state == "7"
+
+    parcels[0] = shipment("PN0300", "AVAILABLE_FOR_DELIVERY", "2026-09-16T07:00:00Z")
+    freezer.tick(timedelta(minutes=11))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(EVENT_ENTITY).attributes["shipment_number"] == "PN0300"
+    assert hass.states.get(READY).state == "1"

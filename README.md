@@ -121,7 +121,9 @@ The `packages` attribute lists the parcels, and each package has these keys.
 | `6`      | Returned to the sender | `RETURNED`, `DELIVERY_REFUSED`   |
 | `7`      | Unknown                | `DELIVERY_IMPOSSIBLE`, any other |
 
-PostNord has no separate "received" or "in delivery" status, so `2` and `4` aren't used.
+PostNord has no separate "received" or "in delivery" status, so `2` and `4` aren't used. `AVAILABLE_FOR_DELIVERY` has
+so far been seen only in the history of parcels already delivered, so reading it as ready for pickup is unconfirmed
+until a parcel waiting at a pickup point shows it.
 
 The `last_checked` attribute is when the parcels were last read from PostNord, whether or not anything had changed.
 

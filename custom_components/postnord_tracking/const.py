@@ -47,7 +47,7 @@ LANGUAGES: Final = ["fi", "sv", "nb", "da", "en"]
 CONF_USERNAME: Final = "username"
 CONF_ACCESS_TOKEN: Final = "access_token"
 CONF_REFRESH_TOKEN: Final = "refresh_token"
-# The account's OpenID subject, which stays the same when its email changes. Saved by every login since 1.2.0.
+# The account's OpenID subject, which stays the same when its email changes.
 CONF_SUBJECT: Final = "subject"
 # Only in the forms: the pasted redirect URL, exchanged for the tokens above.
 CONF_REDIRECT_URL: Final = "redirect_url"
@@ -58,8 +58,8 @@ CONF_MAX_SHIPMENTS: Final = "max_shipments"
 CONF_MAX_OUTGOING_SHIPMENTS: Final = "max_outgoing_shipments"
 CONF_STALE_SHIPMENT_DAY_LIMIT: Final = "stale_shipment_day_limit"
 CONF_COMPLETED_SHIPMENT_DAYS_SHOWN: Final = "completed_shipment_day_shown"
-# Whether packages carry their pickup code. Before config entry version 1.2 (release 1.1.0) this was
-# include_pickup_details, a switch that also held back the pickup point.
+# Whether packages carry their pickup code. include_pickup_details is the switch it replaced, which also held back the
+# pickup point, read only by the migration.
 CONF_PICKUP_CODE: Final = "pickup_code"
 CONF_INCLUDE_PICKUP_DETAILS: Final = "include_pickup_details"
 
