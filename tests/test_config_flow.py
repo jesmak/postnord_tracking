@@ -20,6 +20,7 @@ from .conftest import (
     ENTRY_DATA,
     NEW_ACCESS_TOKEN,
     NEW_REFRESH_TOKEN,
+    REFRESH_TOKEN,
     TOKEN_URL,
     TRACKING_URL,
     USERINFO,
@@ -262,6 +263,7 @@ async def test_logging_in_again_when_the_login_stops_working(hass: HomeAssistant
     assert result["reason"] == "reauth_successful"
     # The username stays as it was: the entities' ids are built from it.
     assert entry.data == {**ENTRY_DATA, **NEW_LOGIN}
+    assert revoked(aioclient_mock) == ["expired"], "the old login isn't left working"
 
 
 async def test_logging_in_again_as_someone_else(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
@@ -332,3 +334,22 @@ async def test_logging_in_again_from_reconfigure(hass: HomeAssistant, aioclient_
 
     assert result["reason"] == "reconfigure_successful"
     assert entry.data == {**ENTRY_DATA, **NEW_LOGIN}
+    assert revoked(aioclient_mock) == [REFRESH_TOKEN], "the old login isn't left working"
+
+
+async def test_the_new_login_is_kept_when_the_old_one_cannot_be_ended(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, caplog: pytest.LogCaptureFixture
+) -> None:
+    aioclient_mock.post(TOKEN_URL, json=LOGIN_TOKENS)
+    aioclient_mock.get(USERINFO_URL, json=USERINFO)
+    aioclient_mock.get(TRACKING_URL, json=tracking())
+    aioclient_mock.post(REVOKE_URL, status=503)
+    entry = account(hass)
+
+    result = await start_reconfigure(hass, entry, "reconfigure_login")
+    result = await paste(hass, result, redirect(result))
+    await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data == {**ENTRY_DATA, **NEW_LOGIN}
+    assert "A login that wasn't kept couldn't be ended at PostNord" in caplog.text

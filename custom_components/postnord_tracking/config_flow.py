@@ -208,6 +208,14 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
             errors = {"base": "wrong_account"}
         return errors
 
+    async def _replace_login(self, entry: ConfigEntry) -> ConfigFlowResult:
+        """Saves the new login in the entry, then ends the old one, so its refresh token isn't left working at PostNord."""
+        old_refresh_token = entry.data.get(CONF_REFRESH_TOKEN)
+        result = self.async_update_reload_and_abort(entry, data={**entry.data, **self._new_login()})
+        if old_refresh_token and old_refresh_token != self._account[CONF_REFRESH_TOKEN]:
+            await self._end_login(old_refresh_token)
+        return result
+
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         return await self.async_step_reauth_confirm()
 
@@ -218,7 +226,7 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             errors = await self._log_in_again(entry, user_input)
             if not errors:
-                return self.async_update_reload_and_abort(entry, data={**entry.data, **self._new_login()})
+                return await self._replace_login(entry)
         return self._show_login("reauth_confirm", errors, username=entry.data[CONF_USERNAME])
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -245,5 +253,5 @@ class PostNordConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             errors = await self._log_in_again(entry, user_input)
             if not errors:
-                return self.async_update_reload_and_abort(entry, data={**entry.data, **self._new_login()})
+                return await self._replace_login(entry)
         return self._show_login("reconfigure_login", errors, username=entry.data[CONF_USERNAME])
