@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker, AiohttpClientMockResponse
+from pytest_homeassistant.test_util.aiohttp import AiohttpClientMocker, AiohttpClientMockResponse
 
 from custom_components.postnord_tracking.const import API_BASE_URL, PATH_TRACKING, TOKEN_URL
 
@@ -37,11 +37,6 @@ TRACKING_URL = API_BASE_URL + PATH_TRACKING
 TOKEN = {"access_token": NEW_ACCESS_TOKEN, "expires_in": 3600, "id_token": "id"}
 # OpenID userinfo of the account, trimmed to what the integration reads.
 USERINFO = {"sub": "user-1", "email": "Matti.Meikalainen@example.com", "email_verified": True}
-
-
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
-    """Lets Home Assistant load integrations from custom_components/."""
 
 
 def shipment(
